@@ -1,0 +1,26 @@
+{
+  "name": "teoclits",
+  "version": "0.0.1",
+  "description": "Typescript angular Teonet Client module",
+  "main": "bundles/teocli.umd.js",
+  "module": "index.js",
+  "typings": "index.d.ts",
+  "peerDependencies": {
+    "@angular/core": "^4.4.6",
+    "rxjs": "^5.5.2",
+    "teocli": "^0.0.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.ksproject.org/teonet/TeocliTS.git"
+  },
+  "keywords": [
+    "angular",
+    "angular2",
+    "angular 2",
+    "teonet",
+    "network"
+  ],
+  "author": "Kirill Scherba <kirill@scherba.ru> (http://gitlab.ksproject.org/)",
+  "license": "MIT"
+}

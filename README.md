@@ -1,11 +1,6 @@
-# Teonet javascript client Module
-
-## Install with bower:  
-```
-bower install teocli
-```
+# Typescript angular Teonet Client module
 
 ## Install with npm:  
 ```
-npm install teocli
+npm install teoclits
 ```

@@ -1,6 +1,6 @@
 {
   "name": "teoclits",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "Typescript angular Teonet Client module",
   "main": "teocli.ts",
   "directories": {
@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@angular/core": "^4.4.6",
-    "teocli": "^0.0.14"
+    "teocli": "^0.0.15"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

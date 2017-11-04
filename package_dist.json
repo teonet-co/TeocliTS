@@ -1,13 +1,13 @@
 {
   "name": "teoclits",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "Typescript angular Teonet Client module",
   "main": "bundles/teocli.umd.js",
   "module": "index.js",
   "typings": "index.d.ts",
   "dependencies": {
     "@angular/core": "^4.4.6",
-    "teocli": "^0.0.14"
+    "teocli": "^0.0.15"
   },
   "repository": {
     "type": "git",

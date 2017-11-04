@@ -22,19 +22,53 @@
  * THE SOFTWARE.
  */
 
+import { Injectable } from '@angular/core';
+import Teocli from 'teocli/teocli';
 
-import {Teocli} from 'teocli/teocli';
-
+@Injectable()
 export class TeonetClient {
-
-    private teocli: Teocli;
+    
+    public teocli: Teocli;
     private ws: WebSocket;
+    private teonet_init = false;
+    private RECONNECT_TIMEOUT = 1000;
+    private subscribers: Array<(ev:string) => void> = [];
+    EVENT = {
+        
+        TEONET_INIT: 'teonet-init',
+        TEONET_CLOSE: 'teonet-close'
+        
+    };
 
     constructor() {
 
+        console.log("TeonetClient::constructor");
         this.connect();
-        this.teocli.onopen = function (ev) {};
-        this.teocli.onclose = function (ev) {};
+    }
+
+    connect(): void {
+
+        this.ws = new WebSocket('ws://' + 'teomac.ksproject.org:80' + '/ws');
+        this.teocli = new Teocli(this.ws);
+
+        this.teocli.onopen = (ev) => {
+            console.log("TeonetClient::teocli.onopen");
+            // Send temporarry name login command to L0 server
+            this.teocli.client_name = "teo-cli-ws-" + Math.floor((Math.random() * 100) + 1);
+            this.teocli.login(this.teocli.client_name);
+            this.send_event(this.EVENT.TEONET_INIT);
+            this.teonet_init = true;
+        };
+        this.teocli.onclose = (ev) => {
+            console.log("TeonetClient::teocli.onclose");
+            // Reconnect after timeout
+            setTimeout(() => {
+              delete this.teocli;
+              this.connect();
+            }, this.RECONNECT_TIMEOUT);
+            this.send_event(this.EVENT.TEONET_CLOSE);
+            this.teonet_init = false;
+        };
         this.teocli.onerror = function (ev) {};
         this.teocli.onother = function (err, data) {
 
@@ -56,17 +90,41 @@ export class TeonetClient {
 
             return processed;
         }
-
-    }
-
-    connect(): void {
-
-        this.ws = new WebSocket('ws://' + 'teomac.ksproject.org:80' + '/ws');
-        this.teocli = new Teocli(this.ws);
     }
 
     disconnect(): void {
         this.ws.close();
     }
+    
+    subscribe(func: (ev:string) => void): void {
+        
+        this.subscribers.push(func);
+    }
+    
+    private send_event(ev: string): void {
+        for (var func of this.subscribers) {
+            func(ev);
+        }
+    }
+    
+    whenEvent(event: string, func: () => void): void {
+        this.subscribe((ev)=>{
+            if (ev == event) {
+                func();
+            }
+        });
+    }
+        
+    isInit(): boolean {
+        return this.teonet_init;
+    }
+    
+    whenInit(func: () => void): void {
+        this.whenEvent(this.EVENT.TEONET_INIT, func);
+        if(this.isInit()) func();
+    }
 
+    whenClose(func: () => void): void {
+        this.whenEvent(this.EVENT.TEONET_CLOSE, func);
+    }
 }

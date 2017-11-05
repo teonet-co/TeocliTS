@@ -30,63 +30,81 @@ export interface TeonetEventType {
     TEONET_CLOSE: string
 };      
 
+export type eventSubscribersFunc = (event: string, ...obj: object[]) => number;
+export type onotherData = { cmd: number, from: string, data: any };
+
+export const Teonet = {
+    authPeer: 'teo-auth'
+}
+
 @Injectable()
-export class TeonetClient extends Teocli {
+export class TeonetCli extends Teocli {
+
 
     private connect_url: string;
     private teonet_init: boolean;
-    private RECONNECT_TIMEOUT:number;
-    private subscribers: Array<(ev:string) => void>;
-    EVENT: TeonetEventType;
+    private RECONNECT_TIMEOUT: number;
+    private isTeonetClientsActiveFunc: ()=> boolean;
+    private eventSubscribers: Array<eventSubscribersFunc>;
+    static EVENT: TeonetEventType = {        
+            TEONET_INIT: 'teonet-init',
+            TEONET_CLOSE: 'teonet-close'        
+    };
 
     constructor() {
 
-        console.log("TeonetClient::constructor");
+        console.log("TeonetCli::constructor");
         var connect_url = 'ws://' + 'teomac.ksproject.org:80' + '/ws';
         var ws = new WebSocket(connect_url);
         super(ws);
-        
-        this.EVENT = {        
-            TEONET_INIT: 'teonet-init',
-            TEONET_CLOSE: 'teonet-close'        
-        };
+        this.isTeonetClientsActiveFunc = () => { return true; };
         this.connect_url = connect_url;
         this.RECONNECT_TIMEOUT = 1000;
         this.teonet_init = false;
-        this.subscribers = [];
+        this.eventSubscribers = [];
         this.ws = ws;
-        this.connect();
+        this.init();
     }
 
-    connect(): void {
-
-        //this.ws = new WebSocket('ws://' + 'teomac.ksproject.org:80' + '/ws');
-        //this.teocli = new Teocli(this.ws);
+    private init(): void {
 
         this.onopen = (ev) => {
-            console.log("TeonetClient::teocli.onopen");
+            console.log("TeonetCli::teocli.onopen");
             // Send temporarry name login command to L0 server
-            this.client_name = "teo-cli-ws-" + Math.floor((Math.random() * 100) + 1);
+            this.client_name = "teo-cli-ts-ws-" + Math.floor((Math.random() * 100) + 1);
             this.login(this.client_name);
-            this.send_event(this.EVENT.TEONET_INIT);
+            this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
             this.teonet_init = true;
         };
+        
         this.onclose = (ev) => {
-            console.log("TeonetClient::teocli.onclose");
+            console.log("TeonetCli::teocli.onclose");
             // Reconnect after timeout
             setTimeout(() => {
-              //\TODO Make reconnect  
-              delete this.ws;
-              this.ws = new WebSocket(this.connect_url);
-              //this.connect();
+                //\TODO Make reconnect  
+                delete this.ws;
+                this.ws = new WebSocket(this.connect_url);
+                this.ws.onopen = this.onopen;
+                this.ws.onclose = this.onclose;
+                this.ws.onerror = this.onerror;
+                this.ws.onmessage = (ev) => {                    
+                    if (!this.process(ev.data)) {
+                        //if (typeof this.onmessage === 'function') {
+                        //    this.onmessage(ev);
+                        //}
+                    }
+                };
+                //this.connect();
             }, this.RECONNECT_TIMEOUT);
-            this.send_event(this.EVENT.TEONET_CLOSE);
+            this.sendEvent(TeonetCli.EVENT.TEONET_CLOSE);
             this.teonet_init = false;
         };
+        
         this.onerror = function (ev) {};
-        this.onother = function (err, data) {
+        
+        this.onother = (err, data: object) => {
 
-            console.log("other_func", data);
+            console.log("TeonetCli::onother", err, data);
 
             var processed = 0;
 
@@ -101,44 +119,122 @@ export class TeonetClient extends Teocli {
             //                $rootScope.networksItems = data.data.networks;
             //                processed = 1;
             //            }
+            
+            if (!processed) this.sendEvent('onother', data);
 
             return processed;
         }
+        this.onecho = (err, data: object) => {
+            console.log("TeonetCli::onecho", err, data);
+            this.sendEvent('onecho', data);
+            return 1;
+        }
+        
+        this.onclients = (err, data: object) => {
+            console.log("TeonetCli::onclients", err, data);
+            this.sendEvent('onclients', data);
+            return 1;
+        }
     }
 
+    /**
+     * Disconnect TeonetCli
+     * 
+     */
     disconnect(): void {
         this.ws.close();
     }
     
-    subscribe(func: (ev:string) => void): void {
-        
-        this.subscribers.push(func);
-    }
-    
-    private send_event(ev: string): void {
-        for (var func of this.subscribers) {
-            func(ev);
-        }
-    }
-    
-    whenEvent(event: string, func: () => void): void {
-        this.subscribe((ev)=>{
-            if (ev == event) {
-                func();
-            }
-        });
-    }
-        
+    /**
+     * Is TeonetCli connected and initialized
+     * 
+     * @returns {boolean} True if connected and initialized
+     */
     isInit(): boolean {
         return this.teonet_init;
     }
     
+    /**
+     * Subscribe to even
+     * 
+     * @param {eventSubscribersFunc} func 
+     */
+    subscribe(func: eventSubscribersFunc): void {
+        
+        this.eventSubscribers.push(func);
+    }
+    
+    /**
+     * Send event to Event Subscriber
+     * 
+     * @param {string} ev Event name
+     * @param {object[]) ...obj Objects send to subscribers
+     */
+    sendEvent(ev: string, ...obj: object[]): void {
+        for (var func of this.eventSubscribers) {
+            func(ev, obj);
+        }
+    }
+    
+    whenEvent(event: string, func: (...obj: object[]) => number): void {
+        this.subscribe((ev: string, ...obj: object[]): number => {
+            if (ev == event) {
+                func(obj);
+            }
+            return 0;
+        });
+    }
+        
     whenInit(func: () => void): void {
-        this.whenEvent(this.EVENT.TEONET_INIT, func);
+        this.whenEvent(TeonetCli.EVENT.TEONET_INIT, ()=>{
+            func();
+            return 0;
+        });
         if(this.isInit()) func();
     }
 
     whenClose(func: () => void): void {
-        this.whenEvent(this.EVENT.TEONET_CLOSE, func);
+        this.whenEvent(TeonetCli.EVENT.TEONET_CLOSE, ()=>{
+            func();
+            return 0;
+        });
     }
-}
+    
+    isTeonetClientsActive() {
+        return this.isTeonetClientsActiveFunc();
+    }
+    
+    setTeonetClientsActive(func: () => boolean) {
+        this.isTeonetClientsActiveFunc = func;
+    }
+    
+    // Clients auth requests ---------------------------------------------------
+    
+    /**
+     * Request user info
+     *
+     * @param {string} name Clients accessToken
+     * @returns {undefined}
+     */
+    send_user_info_request(name: string) {
+
+        console.log("TeonetCli.send_user_info_request", name);
+
+        //if(teocli !== undefined)
+        this.send('{ "cmd": 132, "to": "' + Teonet.authPeer + '", "data": ["' + name + '"] }');
+    }
+
+    /**
+     * Request clients info
+     *
+     * @param {type} client
+     * @returns {undefined}
+     */
+    send_client_info_request(client: string) {
+
+        console.log("ClientsController.send_client_info_request", name);
+
+        //if(teocli !== undefined)
+        this.send('{ "cmd": 134, "to": "' + Teonet.authPeer + '", "data": ["' + client + '"] }');
+    }
+};

@@ -5,3 +5,5 @@
 /index.ngsummary.json
 /package-lock.json
 /teocli.module.ngsummary.json
+/teocli.clients.ngfactory.ts
+/teocli.clients.ngsummary.json

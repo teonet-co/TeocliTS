@@ -1,5 +1,5 @@
 export { TeonetCli, Teonet, onotherData } from './teocli.module';
-export { TeonetClients } from './teocli.clients';
+export { TeonetClients, TeonetClientsNum } from './teocli.clients';
 
 declare global {
     

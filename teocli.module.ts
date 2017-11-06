@@ -31,15 +31,21 @@ export interface TeonetEventType {
 };      
 
 export type eventSubscribersFunc = (event: string, ...obj: object[]) => number;
-export type onotherData = { cmd: number, from: string, data: any };
+export type onotherData = { 
+    cmd: number, 
+    from: string, 
+    data: any 
+};
 
 export const Teonet = {
-    authPeer: 'teo-auth'
+    peer: {
+        l0:     'ps-server',
+        auth:   'teo-auth'
+    }
 }
 
 @Injectable()
 export class TeonetCli extends Teocli {
-
 
     private connect_url: string;
     private teonet_init: boolean;
@@ -206,35 +212,5 @@ export class TeonetCli extends Teocli {
     
     setTeonetClientsActive(func: () => boolean) {
         this.isTeonetClientsActiveFunc = func;
-    }
-    
-    // Clients auth requests ---------------------------------------------------
-    
-    /**
-     * Request user info
-     *
-     * @param {string} name Clients accessToken
-     * @returns {undefined}
-     */
-    send_user_info_request(name: string) {
-
-        console.log("TeonetCli.send_user_info_request", name);
-
-        //if(teocli !== undefined)
-        this.send('{ "cmd": 132, "to": "' + Teonet.authPeer + '", "data": ["' + name + '"] }');
-    }
-
-    /**
-     * Request clients info
-     *
-     * @param {type} client
-     * @returns {undefined}
-     */
-    send_client_info_request(client: string) {
-
-        console.log("ClientsController.send_client_info_request", name);
-
-        //if(teocli !== undefined)
-        this.send('{ "cmd": 134, "to": "' + Teonet.authPeer + '", "data": ["' + client + '"] }');
-    }
+    }    
 };

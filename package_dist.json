@@ -6,8 +6,10 @@
   "module": "index.js",
   "typings": "index.d.ts",
   "dependencies": {
-    "@angular/core": "^4.4.6",
-    "teocli": "^0.0.15"
+    "@angular/core": "4.4.4",
+    "@angular/platform-browser": "4.4.4",   
+    "rxjs/observable/IntervalObservable": "5.4.3",
+    "teocli": "0.0.16"
   },
   "repository": {
     "type": "git",

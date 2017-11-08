@@ -25,7 +25,7 @@
 import { NgModule, Component } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
-import { TeonetCli, Teonet, onotherData } from './teocli.module';
+import { TeonetCli, Teonet, onotherData, onechoData } from './teocli.module';
 import { IntervalObservable } from 'rxjs/observable/IntervalObservable';
 
 export type onclientDisplArEl = { name: string, translate: string, type: string, time: number };
@@ -37,14 +37,6 @@ type onclientsData = {
     data: {
         length: number,
         client_data_ar: onclientsDataAr
-    }
-};
-type onechoData = {
-    cmd: number,
-    from: string,
-    data: {
-        msg: string,
-        time: number
     }
 };
 type userInfo = {
@@ -70,6 +62,13 @@ type clientInfo = {
 //          {{ (client.type ? '(' + client.type + ')' : '') }} \n\
 //          {{ (client.time ? ' -- ' + client.time + ' ms' : '') }}\n\
 //        </div>"
+//        
+//  No: {{i+1}}/{{clients.length}}    
+    styles: ['\n\
+        .teonet-clients-body {\n\
+            font-size: 85%;\n\
+        }\n\
+    '],
     template: '\n\
         <div class="row item item-divider toolbar-background-md">\n\
           <div class="col col-10" col-1>№</div>\n\
@@ -78,8 +77,8 @@ type clientInfo = {
           <div class="col col-20 text-right" col-2 text-right>Ping</div>\n\
         </div>\n\
         \n\
-        <div class="row item" *ngFor="let client of clients; index as i; first as isFirst">\n\
-          <div class="col col-10" col-1>{{i+1}}/{{clients.length}}</div>\n\
+        <div class="teonet-clients-body row item" *ngFor="let client of clients; index as i; first as isFirst">\n\
+          <div class="col col-10" col-1>{{i+1}}</div>\n\
           <div class="col"><a href="">{{(client.translate ? client.translate : client.name) | slice:0:25}}</a></div>\n\
           <div class="col">{{(client.type ? client.type : "") | slice:0:25}}</div>\n\
           <div class="col col-20 text-right" col-2 text-right>{{(client.time ? client.time : "")}}</div>\n\
@@ -100,7 +99,7 @@ export class TeonetClients {
 
         t.whenInit(() => {
             console.log('TeonetClients::whenInit');
-            t.clients('ps-server');
+            t.clients(Teonet.peer.l0);
         });
 
         t.whenClose(() => {
@@ -252,11 +251,11 @@ export class TeonetClients {
         });
 
         //Send clients list request to L0 server
-        t.clients('ps-server');
+        t.clients(Teonet.peer.l0);
         //.subscribe(n => this.n = n);
         IntervalObservable.create(1000).subscribe(() => {
             this.n++;
-            if (this.isComponentActive()) t.clients('ps-server');
+            if (this.isComponentActive()) t.clients(Teonet.peer.l0);
         });
     }
 
@@ -344,7 +343,7 @@ export class TeonetClientsNum {
 
             type CMD_L0_CLIENTS_N_ANSWER = { numClients: number };
 
-            console.log("TeonetClientsNum.processClientsNum, data:", data);
+            console.log("TeonetClientsNum::processClientsNum, data:", data);
 
             clientsNumber = (<CMD_L0_CLIENTS_N_ANSWER>data.data).numClients;
             this.sendClientsNumSubscribe();
@@ -378,7 +377,7 @@ export class TeonetClientsNum {
 
         if(processed) {
 
-            console.log("TeonetClientsNum.clientsNumber_func, data:",
+            console.log("TeonetClientsNum::processClientsNum, data:",
                         data, "client:", client, "client_code:", client_code);
 
             this.num_clients = clientsNumber;

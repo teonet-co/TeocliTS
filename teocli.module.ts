@@ -269,8 +269,20 @@ import { TeonetClientsNum } from './teocli.clients';
         top: 10px;\n\
         /*font-size: 60%;*/\n\
     }\n\
+    /deep/ ion-nav.menu-content-open + teonet-status {\n\
+        display: none;\n\
+    }\n\
+    /deep/ ion-app.platform-ios .teonet-status {\n\
+        top: 22px;\n\
+    }\n\
     .teonet-status-no-badge {\n\
         top: 3px;\n\
+    }\n\
+    /deep/ ion-app.platform-ios .teonet-status-no-badge {\n\
+        top: 35px;\n\
+    }\n\
+    /deep/ ion-app.platform-android .teonet-status-no-badge {\n\
+        top: 20px;\n\
     }\n\
     .teonet-status-badge {\n\
         position: absolute;\n\

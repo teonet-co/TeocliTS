@@ -189,7 +189,7 @@ export class TeonetCli extends Teocli {
     /**
      * Get teonet status
      *
-     * @return {string} Teonet status string
+     * @return {number} Teonet status
      */
     getStatus(): number {
         return this.status;
@@ -201,7 +201,6 @@ export class TeonetCli extends Teocli {
      * @param {eventSubscribersFunc} func
      */
     subscribe(func: eventSubscribersFunc): void {
-
         this.eventSubscribers.push(func);
     }
 

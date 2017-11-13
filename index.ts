@@ -1,5 +1,6 @@
-export {TeonetCli, TeonetStatus, Teonet, onotherData, onechoData } from './teocli.module';
+export { TeonetCli, TeonetStatus, Teonet, onotherData, onechoData } from './teocli.module';
 export { TeonetClients, TeonetClientsNum } from './teocli.clients';
+export { TeonetAuth } from './teocli.auth';
 
 declare global {
     

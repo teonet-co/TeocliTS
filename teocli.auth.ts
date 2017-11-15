@@ -129,6 +129,22 @@ export class Base64 {
 }
 
 /**
+ * Class to store teonet client data
+ */
+export class TeonetStorage {
+  
+  constructor(private key: string) {}
+  
+  get() {
+    return JSON.parse( <string>localStorage.getItem(this.key));
+  }
+  
+  set(value: any) {
+    localStorage.setItem(this.key, JSON.stringify(value));
+  }
+}
+
+/**
  * Class to send clients requests to authentication teonet peer
  */
 export class TeonetAuthRequests {
@@ -216,13 +232,18 @@ export class TeonetAuth {
    * TeocliCrypto (based on CryptoJS) class object
    */
   private teocliCrypto = new TeocliCrypto(CryptoJS);
+  
+  /**
+   * TeonetStorage class object with key 'teonet_user'
+   */
+  storage = new TeonetStorage('teonet_user');
 
   /**
    * User class constructor
    */
   constructor(private teocli: TeonetCli) {
     
-    this.$localStorage =   {
+    this.$localStorage =  {
       
       settings: {
         auth_server_addr: '',
@@ -230,20 +251,12 @@ export class TeonetAuth {
         auth_separate: ''
       },
 
-      user: {
-        username: '',
-        clientId: '',
-        clientSecret: '',
-        clientKey: '',
-        accessToken: '',
-        expiresIn: '',
-        refreshToken: ''
-      }
+      user: this.storage.get(),
     };
 
     this.$location = {
       path: (url: string) => {
-        console.error('User::$location.path try change location to: ', url);
+        console.error('TeonetAuth::$location.path try change location to: ', url);
       }
     };
   }
@@ -318,6 +331,10 @@ export class TeonetAuth {
    */
   private _encode(text: string): string {
     return this.base64.encode(text);
+  }
+  
+  private _decode(text: string): string {
+    return this.base64.decode(text);
   }
 
   /**
@@ -405,6 +422,13 @@ export class TeonetAuth {
       this.$rootScope.userLogin = ""; //"Login";
     }
   };
+  
+  /**
+   * Get user from teonet storage
+   */
+  getUser() {
+    return this.$localStorage.user;
+  }
 
   /**
    * Register client
@@ -427,7 +451,8 @@ export class TeonetAuth {
 
     var success = (response: response) => {
 
-      this.$localStorage.user = response.data;
+      //this.$localStorage.user = response.data;
+      this._extend(this.$localStorage.user, response.data);
 
       // Delay before login/register to get time to save data to DataBase
       setTimeout(function () {
@@ -437,7 +462,7 @@ export class TeonetAuth {
 
     // HTTP request
     if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-      console.error('User::registerClient The HTTP request to authentication' +
+      console.error('TeonetAuth::registerClient The HTTP request to authentication' +
         'server hase not implemented');
       //\TODO: implement HTTP request
       //      this.$http({
@@ -465,7 +490,7 @@ export class TeonetAuth {
       '',                   // Header
       this._ws_timeout,     // Timeout
       (err: any, response: response) => {  // Callback
-        console.debug("User::registerClient teocli.auth register-client: ", err, response);
+        console.debug("TeonetAuth::registerClient teocli.auth register-client: ", err, response);
         if (!this._check_error(err, response, callback)) success(response);
       });
   };
@@ -513,7 +538,7 @@ export class TeonetAuth {
 
       // HTTP request
       if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-        console.error('User::register The HTTP request to authentication' +
+        console.error('TeonetAuth::register The HTTP request to authentication' +
           'server hase not implemented');
         //\TODO: Implement HTTP request
         //              this.$http({
@@ -545,7 +570,7 @@ export class TeonetAuth {
         "Authorization: Basic " + this._encode(user.clientId + ':' + user.clientSecret),
         this._ws_timeout,
         (err: any, response: response) => {
-          console.log("User::register teocli.auth register: ", err, response);
+          console.log("TeonetAuth::register teocli.auth register: ", err, response);
           // Check error
           if (!this._check_error(err, response, callback)) success(response);
         }
@@ -578,17 +603,19 @@ export class TeonetAuth {
         var dec = this._decrypt(response.data.data, this.$localStorage.user.clientKey);
         //angular.extend($localStorage.user, JSON.parse(dec.toString()));
         this._extend(this.$localStorage.user, JSON.parse(dec.toString()));
-        callback(null, response || "Request success");
 
-        // Save refresh time
+        console.log('TeonetAuth::login success $localStorage.user = ', this.$localStorage.user);
+        localStorage.setItem('teonet_user', JSON.stringify(this.$localStorage.user));
+
         this._setRefreshTime();
+        callback(null, response || "Request success");
       };
 
       var user = this.$localStorage.user;
 
       // HTTP request
       if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-        console.error('User::register The HTTP request to authentication' +
+        console.error('TeonetAuth::login The HTTP request to authentication' +
           'server hase not implemented');
         //\TODO: Implement HTTP request
         //          this.$http({
@@ -619,7 +646,7 @@ export class TeonetAuth {
         "Authorization: Basic " + this._encode(user.clientId + ':' + user.clientSecret),
         this._ws_timeout,
         (err: any, response: response) => {
-          console.log("User::login teocli.auth login:", err, response);
+          console.log("TeonetAuth::login teocli.auth login:", err, response);
           if (!this._check_error(err, response, callback)) success(response);
         }
       );
@@ -633,7 +660,7 @@ export class TeonetAuth {
    */
   refresh(callback: any) {
 
-    console.log("User::refresh");
+    console.log("TeonetAuth::refresh");
 
     var user = this.$localStorage.user;
     var data = {refreshToken: user.refreshToken};
@@ -658,7 +685,7 @@ export class TeonetAuth {
 
     // HTTP request
     if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-      console.error('User::refresh The HTTP request to authentication' +
+      console.error('TeonetAuth::refresh The HTTP request to authentication' +
         'server hase not implemented');
       // //\TODO: Implement HTTP request
       //            this.$http({
@@ -688,7 +715,7 @@ export class TeonetAuth {
       "Authorization: Basic " + this._encode(user.clientId + ':' + user.clientSecret),
       this._ws_timeout,
       (err: any, response: response) => {
-        console.log("User::refresh teocli.auth refresh:", err, response);
+        console.log("TeonetAuth::refresh teocli.auth refresh:", err, response);
         if (this._check_error(err, response, callback)) error();
         else success(response);
       }
@@ -726,7 +753,7 @@ export class TeonetAuth {
 
       // HTTP request
       if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-        console.error('User::restore The HTTP request to authentication' +
+        console.error('TeonetAuth::restore The HTTP request to authentication' +
           'server hase not imp        lemented');
         //\TODO: Implement HTTP request
         //        this.$http({
@@ -756,7 +783,7 @@ export class TeonetAuth {
         JSON.stringify(data),
         'Authorization: Basic ' + this._encode(user.clientId + ':' + user.clientSecret),
         this._ws_timeout, (err: any, response: response) => {
-          console.log("User::restore teocli.auth restore:", err, response);
+          console.log("TeonetAuth::restore teocli.auth restore:", err, response);
           if (this._check_error(err, response, callback)) error();
           else success(response);
         }
@@ -798,7 +825,7 @@ export class TeonetAuth {
 
         // HTTP request
         if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-          console.error('User::restore The HTTP request to authentication' +
+          console.error('TeonetAuth::restore The HTTP request to authentication' +
             'server hase not imp        lemented');
           //\TODO: Implement HTTP request
           //                   this.$http({
@@ -829,7 +856,7 @@ export class TeonetAuth {
           "Authorization: Bearer " + user.accessToken,
           this._ws_timeout,
           (err: any, response: response) => {
-            console.log("User::changeUsername teocli.auth.changeUsername:", err, response);
+            console.log("TeonetAuth::changeUsername teocli.auth.changeUsername:", err, response);
             if (this._check_error(err, response, callback)) error();
             else success(response);
           }
@@ -877,7 +904,7 @@ export class TeonetAuth {
 
         // HTTP request
         if (this.$localStorage.settings && this.$localStorage.settings.auth_separate) {
-          console.error('User::restore The HTTP request to authentication' +
+          console.error('TeonetAuth::restore The HTTP request to authentication' +
             'server hase not imp        lemented');
           //\TODO: Implement HTTP request
           //                  this.$http({
@@ -909,7 +936,7 @@ export class TeonetAuth {
           "Authorization: Bearer " + user.accessToken,
           this._ws_timeout,
           (err: any, response: response) => {
-            console.log("User::changeUsername teocli.auth.changeUserpassword:", err, response);
+            console.log("TeonetAuth::changeUsername teocli.auth.changeUserpassword:", err, response);
             if (this._check_error(err, response, callback)) error();
             else success(response);
           }

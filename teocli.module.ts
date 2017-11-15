@@ -22,240 +22,341 @@
  * THE SOFTWARE.
  */
 
-import { Injectable } from '@angular/core';
+import {Injectable} from '@angular/core';
+import {TeonetAuth} from './teocli.auth';
 import Teocli from 'teocli/teocli';
 
 export interface TeonetEventType {
-    TEONET_INIT: string,
-    TEONET_CLOSE: string
+  TEONET_INIT: string,
+  TEONET_CLOSE: string
 };
 
 export type eventSubscribersFunc = (event: string, ...obj: object[]) => number;
 export type onotherData = {
-    cmd: number,
-    from: string,
-    data: any
+  cmd: number,
+  from: string,
+  data: any
 };
 export type onechoData = {
-    cmd: number,
-    from: string,
-    data: {
-        msg: string,
-        time: number
-    }
+  cmd: number,
+  from: string,
+  data: {
+    msg: string,
+    time: number
+  }
 };
 
 export const Teonet = {
-    peer: {
-        l0:     'ps-server',
-        auth:   'teo-auth'
-    },
-    status: {
-        offline:    0,
-        connecting: 1,
-        logining:   2,
-        online:     3
-    }
-
+  peer: {
+    l0: 'ps-server',
+    auth: 'teo-auth'
+  },
+  status: {
+    offline: 0,
+    connecting: 1,
+    logining: 2,
+    online: 3
+  }
 }
 
 @Injectable()
 export class TeonetCli extends Teocli {
 
-    status: number;
-    private connect_url: string;
-    private inited: boolean;
-    private RECONNECT_TIMEOUT: number;
-    private INIT_TIMEOUT: number;
-    private isTeonetClientsActiveFunc: ()=> boolean;
-    private eventSubscribers: Array<eventSubscribersFunc>;
-    static EVENT: TeonetEventType = {
-            TEONET_INIT: 'teonet-init',
-            TEONET_CLOSE: 'teonet-close'
+  status: number;
+  private client_name: string;
+  private connect_url: string;
+  private inited: boolean;
+  private RECONNECT_TIMEOUT: number;
+  private INIT_TIMEOUT: number;
+  private isTeonetClientsActiveFunc: () => boolean;
+  private eventSubscribers: Array<eventSubscribersFunc>;
+  private login_page: any;
+  static EVENT: TeonetEventType = {
+    TEONET_INIT: 'teonet-init',
+    TEONET_CLOSE: 'teonet-close'
+  };  
+
+  constructor() {
+
+    console.debug("TeonetCli::constructor");
+    var connect_url = 'ws://' + 'teomac.ksproject.org:80' + '/ws';
+    var ws = new WebSocket(connect_url);
+    super(ws);
+    this.status = Teonet.status.connecting
+    this.isTeonetClientsActiveFunc = () => {return true;};
+    this.connect_url = connect_url;
+    this.RECONNECT_TIMEOUT = 1000;
+    this.INIT_TIMEOUT = 7000;
+    this.inited = false;
+    this.eventSubscribers = [];
+    this.ws = ws;
+    this.init();
+  }
+
+  private init(): void {
+
+    let authserver = new TeonetAuth(this);
+        
+    this.onopen = (ev) => {
+      console.debug("TeonetCli::teocli.onopen");
+
+      // Send name login command to L0 server
+      this.status = Teonet.status.logining;
+      if (!this.client_name) {
+
+        // Get name from local storage
+        let user = authserver.storage.get();
+        console.debug("TeonetCli::init user", user);
+        if (user.remember_me && user.accessToken) {
+          //this.setClientName(user.userId + ':' + user.clientId);
+          this.setClientName(user.accessToken);
+        }
+        // Set temporary name
+        else {
+          this.setClientName('teo-cli-ts-ws-' + Math.floor((Math.random() * 100) + 1));
+        }
+      }
+      this.login(this.client_name);
+      // Set reconnect timeout (reconnect if does not login during timeout
+      setTimeout(() => {
+        if (!this.isInit()) {
+          console.debug("TeonetCli::teocli.onopen can't login - disconnect");
+          this.disconnect();
+        }
+      }, this.INIT_TIMEOUT);
     };
 
-    constructor() {
-
-        console.log("TeonetCli::constructor");
-        var connect_url = 'ws://' + 'teomac.ksproject.org:80' + '/ws';
-        var ws = new WebSocket(connect_url);
-        super(ws);
-        this.status = Teonet.status.connecting
-        this.isTeonetClientsActiveFunc = () => { return true; };
-        this.connect_url = connect_url;
-        this.RECONNECT_TIMEOUT = 1000;
-        this.INIT_TIMEOUT = 7000;        
-        this.inited = false;
-        this.eventSubscribers = [];
-        this.ws = ws;
-        this.init();
-    }
-
-    private init(): void {
-
-        this.onopen = (ev) => {
-            console.log("TeonetCli::teocli.onopen");
-            // Send temporarry name login command to L0 server
-            this.client_name = "teo-cli-ts-ws-" + Math.floor((Math.random() * 100) + 1);
-            this.status = Teonet.status.logining;
-            this.login(this.client_name);
-            // Set reconnect timeout (reconnect if does not login during timeout
-            setTimeout(() => {
-                if (!this.isInit()) {
-                    console.log("TeonetCli::teocli.onopen can't login - disconnect");
-                    this.disconnect();
-                }
-            }, this.INIT_TIMEOUT);
+    this.onclose = (ev) => {
+      console.debug("TeonetCli::teocli.onclose");
+      // Reconnect after timeout
+      setTimeout(() => {
+        delete this.ws;
+        this.status = Teonet.status.connecting;
+        this.ws = new WebSocket(this.connect_url);
+        this.ws.onopen = this.onopen;
+        this.ws.onclose = this.onclose;
+        this.ws.onerror = this.onerror;
+        this.ws.onmessage = (ev) => {
+          if (!this.process(ev.data)) {
+            //if (typeof this.onmessage === 'function') {
+            //    this.onmessage(ev);
+            //}
+          }
         };
+      }, this.RECONNECT_TIMEOUT);
+      this.sendEvent(TeonetCli.EVENT.TEONET_CLOSE);
+      this.status = Teonet.status.offline;
+      this.inited = false;
+    };
 
-        this.onclose = (ev) => {
-            console.log("TeonetCli::teocli.onclose");
-            // Reconnect after timeout
-            setTimeout(() => {
-                delete this.ws;
-                this.status = Teonet.status.connecting;
-                this.ws = new WebSocket(this.connect_url);
-                this.ws.onopen = this.onopen;
-                this.ws.onclose = this.onclose;
-                this.ws.onerror = this.onerror;
-                this.ws.onmessage = (ev) => {
-                    if (!this.process(ev.data)) {
-                        //if (typeof this.onmessage === 'function') {
-                        //    this.onmessage(ev);
-                        //}
-                    }
-                };
-            }, this.RECONNECT_TIMEOUT);
-            this.sendEvent(TeonetCli.EVENT.TEONET_CLOSE);
-            this.status = Teonet.status.offline;
-            this.inited = false;
+    this.onerror = function (ev) {};
+
+    this.onother = (err, data: object) => {
+
+      console.debug("TeonetCli::onother", err, data);
+
+      var processed = 0;
+      var d = <onotherData> data;
+
+      // Check login answer
+      if (data && d.cmd === 96) {
+        console.debug("TeonetCli:: Got check login answer", d);
+        
+        // Set name 
+        this.setClientName(d.data.name);
+        
+        // Get user from storage
+        let user = authserver.storage.get();
+        
+        // Send teocli-init event
+        let sendEventInit = () => {
+          this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
+          this.status = Teonet.status.online;
+          this.inited = true;
+          //$rootScope.networksItems = data.data.networks;
         };
-
-        this.onerror = function (ev) {};
-
-        this.onother = (err, data: object) => {
-
-            console.log("TeonetCli::onother", err, data);
-
-            var processed = 0;
-            var d = <onotherData>data;
-
-            // Check login answer
-            if(data && d.cmd === 96) {
-                console.log("TeonetCli:: Got check login answer", d);
-
-                // Send teocli-init event
-                this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
-                this.status = Teonet.status.online;
-                this.inited = true;
-                //$rootScope.networksItems = data.data.networks;
-                processed = 1;
-            }
-
-            if (!processed) this.sendEvent('onother', data);
-
-            return processed;
+        
+        // Login success
+        if (this.getClientName() == user.userId + ':' + user.clientId) {                    
+          sendEventInit();
+        } 
+        
+        // Login if remember_me is set
+        else {
+          if (user.remember_me) {
+            //authserver.refresh(); // refresh auth token
+            authserver.login(user.email, user.password, (err: any, response: any) => {
+              if (err) {
+                // Goto Login screen
+                sendEventInit();
+                this.loginPage();
+              }
+              else {
+                // Reconect with new client name
+                user = authserver.getUser();
+                this.setClientName(user.accessToken);
+                this.disconnect();
+              }
+            });
+          }
+          else {
+            // Goto Login screen
+            sendEventInit();
+            this.loginPage();
+          }
         }
-        this.onecho = (err, data: object) => {
-            console.log("TeonetCli::onecho", err, data);
-            this.sendEvent('onecho', data);
-            return 1;
-        }
+        processed = 1;
+      }
 
-        this.onclients = (err, data: object) => {
-            console.log("TeonetCli::onclients", err, data);
-            this.sendEvent('onclients', data);
-            return 1;
-        }
+      if (!processed) this.sendEvent('onother', data);
+
+      return processed;
     }
 
-    /**
-     * Disconnect TeonetCli
-     *
-     */
-    disconnect(): void {
-        this.ws.close();
+    this.onecho = (err, data: object) => {
+      console.debug("TeonetCli::onecho", err, data);
+      this.sendEvent('onecho', data);
+      return 1;
     }
 
-    /**
-     * Is TeonetCli connected and initialized
-     *
-     * @returns {boolean} True if connected and initialized
-     */
-    isInit(): boolean {
-        return this.inited;
+    this.onclients = (err, data: object) => {
+      console.debug("TeonetCli::onclients", err, data);
+      this.sendEvent('onclients', data);
+      return 1;
     }
+  }
 
-    /**
-     * Get teonet status
-     *
-     * @return {number} Teonet status
-     */
-    getStatus(): number {
-        return this.status;
+  /**
+   * Disconnect TeonetCli
+   *
+   */
+  disconnect(): void {
+    this.ws.close();
+  }
+  
+  /**
+   * Sel login screen
+   */
+  setLoginPage(func:()=>void) {
+    this.login_page = func;
+  }
+  
+  /**
+   * Load login screen
+   */
+  loginPage() {
+    if (this.login_page) this.login_page();
+    else {
+      alert('TODO: Login screen is udefined!');
     }
+  }
 
-    /**
-     * Subscribe to even
-     *
-     * @param {eventSubscribersFunc} func
-     */
-    subscribe(func: eventSubscribersFunc): void {
-        this.eventSubscribers.push(func);
-    }
+  /**
+   * Is TeonetCli connected and initialized
+   *
+   * @returns {boolean} True if connected and initialized
+   */
+  isInit(): boolean {
+    return this.inited;
+  }
 
-    /**
-     * Send event to Event Subscriber
-     *
-     * @param {string} ev Event name
-     * @param {object[]) ...obj Objects send to subscribers
-     */
-    sendEvent(ev: string, ...obj: object[]): void {
-        for (var func of this.eventSubscribers) {
-            func(ev, obj);
-        }
-    }
+  /**
+   * Get teonet status
+   *
+   * @return {number} Teonet status
+   */
+  getStatus(): number {
+    return this.status;
+  }
 
-    whenEvent(event: string, func: (...obj: object[]) => number): void {
-        this.subscribe((ev: string, ...obj: object[]): number => {
-            if (ev == event) {
-                func(obj);
-            }
-            return 0;
-        });
-    }
+  /**
+   * Get client name
+   *
+   * @return {string} Teonet client name
+   */
+  getClientName(): string {
+    return this.client_name;
+  }
 
-    whenInit(func: () => void): void {
-        this.whenEvent(TeonetCli.EVENT.TEONET_INIT, ()=>{
-            func();
-            return 0;
-        });
-        if(this.isInit()) func();
-    }
+  /**
+   * Set client name
+   *
+   * @return {string} Teonet client name
+   */
+  setClientName(name: string = '') {
+    this.client_name = name;
+  }
 
-    whenClose(func: () => void): void {
-        this.whenEvent(TeonetCli.EVENT.TEONET_CLOSE, ()=>{
-            func();
-            return 0;
-        });
-    }
+  /**
+   * Subscribe to even
+   *
+   * @param {eventSubscribersFunc} func
+   */
+  subscribe(func: eventSubscribersFunc) {
+    this.eventSubscribers.push(func);
+    return func;
+  }
+  
+  unsubscribe(func: eventSubscribersFunc): void {
+//    this.eventSubscribers.slice(
+//      this.eventSubscribers.findIndex((el)=>{
+//        return el == func;
+//      }), 1);
+    this.eventSubscribers = this.eventSubscribers.filter(f => f !== func);
+  }
 
-    isTeonetClientsActive() {
-        return this.isTeonetClientsActiveFunc();
+  /**
+   * Send event to Event Subscriber
+   *
+   * @param {string} ev Event name
+   * @param {object[]) ...obj Objects send to subscribers
+   */
+  sendEvent(ev: string, ...obj: object[]): void {
+    for (var func of this.eventSubscribers) {
+      func(ev, obj);
     }
+  }
 
-    setTeonetClientsActive(func: () => boolean) {
-        this.isTeonetClientsActiveFunc = func;
-    }
+  whenEvent(event: string, func: (...obj: object[]) => number) {
+    return this.subscribe((ev: string, ...obj: object[]): number => {
+      if (ev == event) {
+        func(obj);
+      }
+      return 0;
+    });
+  }
+
+  whenInit(func: () => void) {
+    if (this.isInit()) func();
+    return this.whenEvent(TeonetCli.EVENT.TEONET_INIT, () => {
+      func();
+      return 0;
+    });
+  }
+
+  whenClose(func: () => void) {
+    return this.whenEvent(TeonetCli.EVENT.TEONET_CLOSE, () => {
+      func();
+      return 0;
+    });
+  }
+
+  isTeonetClientsActive() {
+    return this.isTeonetClientsActiveFunc();
+  }
+
+  setTeonetClientsActive(func: () => boolean) {
+    this.isTeonetClientsActiveFunc = func;
+  }
 };
 
 
-import { NgModule, Component } from '@angular/core';
-import { AfterContentInit } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { IntervalObservable } from 'rxjs/observable/IntervalObservable';
+import {NgModule, Component} from '@angular/core';
+import {AfterContentInit} from '@angular/core';
+import {BrowserModule} from '@angular/platform-browser';
+import {IntervalObservable} from 'rxjs/observable/IntervalObservable';
 
-import { TeonetClientsNum } from './teocli.clients';
+import {TeonetClientsNum} from './teocli.clients';
 
 @Component({
   selector: 'teonet-status',
@@ -327,178 +428,183 @@ import { TeonetClientsNum } from './teocli.clients';
  */
 export class TeonetStatus implements AfterContentInit {
 
-    peer: string = '';           //! Peer name Component input
-    label: string = 'Teo is';    //! Label of state Component input
-    reconnect: string = 'true'; //! Reconnect when peer don't answer
-    show_peer: string = 'false'; //! Show peer name Component input
+  peer: string = '';           //! Peer name Component input
+  label: string = 'Teo is';    //! Label of state Component input
+  reconnect: string = 'true';  //! Reconnect when peer don't answer
+  show_peer: string = 'false'; //! Show peer name Component input
 
-    tcli: TeonetClientsNum;     //! TeonetClientsNum object
-    time: number = this.t.status == Teonet.status.online ? 0 : -1; //! Peer answer time in ms
+  tcli: TeonetClientsNum;      //! TeonetClientsNum object
+  time: number = (this.t.status == Teonet.status.online) ? 0 : -1; //! Peer answer time in ms
 
-    private last_answere = 0;   //! Last peer answer time
+  private last_answere = 0.00; //! Last peer answer time
 
-    private SEND_ECHO_AFTER = 1.00;
-    private SET_LOGOFF_AFTER = 2.00;
-    private RECONNECT_AFTER = 15.00;
+  private SEND_ECHO_AFTER = 1.00;
+  private SET_LOGOFF_AFTER = 2.00;
+  private RECONNECT_AFTER = 15.00;
 
-    /**
-     * Constructor connect to Teonet and load TeonetClientsNum class
-     */
-    constructor(public t: TeonetCli) {
-        console.log('TeonetStatus::constructor, peer = ' + this.peer);
-        this.tcli = new TeonetClientsNum(t);
-    }
+  /**
+   * Constructor connect to Teonet and load TeonetClientsNum class
+   */
+  constructor(public t: TeonetCli) {
+    console.debug('TeonetStatus::constructor, peer = ' + this.peer);
+    this.tcli = new TeonetClientsNum(t);
+  }
 
-    /**
-     * This function calls by angular after html content init
-     */
-    ngAfterContentInit() {
-        console.log('TeonetStatus::ngAfterContentInit, peer = ' + this.peer +
-                    ', reconnect: ' + this.reconnect);
-        if(this.peer) {
+  /**
+   * This function calls by angular after html content init
+   */
+  ngAfterContentInit() {
+    console.debug('TeonetStatus::ngAfterContentInit, peer = ' + this.peer +
+      ', reconnect: ' + this.reconnect);
+    if (this.peer) {
 
-            //Send ping to peer
+      //Send ping to peer
+      this.sendEcho();
+      IntervalObservable.create(1000).subscribe(() => {
+        if (this.t.isInit()) {
+          let date = new Date();
+          let current = date.valueOf() / 1000.0;
+          if ((current - this.last_answere) > this.SEND_ECHO_AFTER) {
             this.sendEcho();
-            IntervalObservable.create(1000).subscribe(() => {
-                if (this.t.isInit()) {
-                    let date = new Date();
-                    let current = date.valueOf()/1000;
-                    if(current - this.last_answere > this.SEND_ECHO_AFTER) {
-                        this.sendEcho();
-                    }
-                    if(!this.last_answere) this.last_answere = current;
-                    if(this.time >= 0 && this.last_answere && 
-                       (current - this.last_answere) > this.SET_LOGOFF_AFTER) {
-                        console.log('TeonetStatus::IntervalObservable - set "peer logoff"');
-                        this.time = -1;
-                    }
-                    if(this.last_answere && 
-                       (current - this.last_answere) > this.RECONNECT_AFTER && 
-                       this.reconnect == 'true') {
-                        console.log('TeonetStatus::IntervalObservable - disconnect from teonet');
-                        this.last_answere = 0;
-                        this.t.disconnect();
-                    }
-                }
-                else this.time = -1;
-            });
-
-            // Process echo answer
-            this.t.whenEvent('onecho', (data: any): number => {
-
-                let d: onechoData = data[0][0];
-                console.log('TeonetStatus::onecho', data, d);
-                if (d.from == this.peer) {
-                    let date = new Date();
-                    this.time = d.data.time;
-                    this.last_answere = date.valueOf()/1000;
-                }
-
-                return 0;
-            });
+          }
+          if (!this.last_answere) this.last_answere = current;
+          if (this.time >= 0 && this.last_answere &&
+            (current - this.last_answere) > this.SET_LOGOFF_AFTER) {
+            console.debug('TeonetStatus::IntervalObservable - set "peer logoff"');
+            this.time = -1;
+          }
+          if (this.last_answere &&
+            (current - this.last_answere) > this.RECONNECT_AFTER &&
+            this.reconnect == 'true') {
+            console.debug('TeonetStatus::IntervalObservable' +
+                        '- disconnect from teonet, ' +
+                        '(current - this.last_answere) = ', 
+                        (current - this.last_answere)
+            );
+            this.last_answere = 0;
+            this.t.disconnect();
+          }
         }
-    }
+        else this.time = -1;
+      });
 
-    /**
-     * Send ping to peer
-     */
-    private sendEcho() {
-        console.log('TeonetStatus::sendEcho to peer: ' + this.peer);
-        this.t.echo(this.peer, 'TeonetStatus');
-    }
+      // Process echo answer
+      this.t.whenEvent('onecho', (data: any): number => {
 
-    /**
-     * Return true if Teonet is online
-     * @return {boolean}
-     */
-    ifOnline() {
-        return this.t.status == Teonet.status.online;
-    }
-
-    /**
-     * Return true if peer input is set
-     *
-     * @param {string} peer Peer name
-     */
-    ifPeer(peer: string) {
-        if(peer) return true;
-        else return false;
-    }
-
-    /**
-     * Get  Teonet status color
-     *
-     * @param {number} Teonet status
-     * @return Teonet status color string
-     */
-    getStatusColor(status: number): string {
-
-        let color: string;
-
-        switch(status) {
-
-            case Teonet.status.offline:
-              color = 'danger';
-              break;
-
-            case Teonet.status.connecting:
-              color = 'dark';
-              break;
-
-            case Teonet.status.logining:
-              color = 'primary';
-              break;
-
-            case Teonet.status.online:
-              color = 'secondary';
-              break;
-
-            default:
-              color = 'light';
+        let d: onechoData = data[0][0];
+        console.debug('TeonetStatus::onecho', data, d, 'this.peer:', this.peer);
+        if (d.from == this.peer) {
+          let date = new Date();
+          this.time = d.data.time;
+          this.last_answere = date.valueOf() / 1000.0;
+          console.debug('TeonetStatus::onecho this.last_answere:', this.last_answere);
         }
 
-        return color;
+        return 0;
+      });
+    }
+  }
+
+  /**
+   * Send ping to peer
+   */
+  private sendEcho() {
+    console.debug('TeonetStatus::sendEcho to peer: ' + this.peer);
+    this.t.echo(this.peer, 'TeonetStatus');
+  }
+
+  /**
+   * Return true if Teonet is online
+   * @return {boolean}
+   */
+  ifOnline() {
+    return this.t.status == Teonet.status.online;
+  }
+
+  /**
+   * Return true if peer input is set
+   *
+   * @param {string} peer Peer name
+   */
+  ifPeer(peer: string) {
+    if (peer) return true;
+    else return false;
+  }
+
+  /**
+   * Get  Teonet status color
+   *
+   * @param {number} Teonet status
+   * @return Teonet status color string
+   */
+  getStatusColor(status: number): string {
+
+    let color: string;
+
+    switch (status) {
+
+      case Teonet.status.offline:
+        color = 'danger';
+        break;
+
+      case Teonet.status.connecting:
+        color = 'dark';
+        break;
+
+      case Teonet.status.logining:
+        color = 'primary';
+        break;
+
+      case Teonet.status.online:
+        color = 'secondary';
+        break;
+
+      default:
+        color = 'light';
     }
 
-    /**
-     * Get name of Teonet status
-     *
-     * @param {number} Teonet status
-     * @return Teonet status string
-     */
-    getStatusText(status: number): string {
+    return color;
+  }
 
-        let text: string;
+  /**
+   * Get name of Teonet status
+   *
+   * @param {number} Teonet status
+   * @return Teonet status string
+   */
+  getStatusText(status: number): string {
 
-        switch(status) {
+    let text: string;
 
-            case Teonet.status.offline:
-              text = 'Offline';
-              break;
+    switch (status) {
 
-            case Teonet.status.connecting:
-              text = 'Connecting...';
-              break;
+      case Teonet.status.offline:
+        text = 'Offline';
+        break;
 
-            case Teonet.status.logining:
-              text = 'Logining';
-              break;
+      case Teonet.status.connecting:
+        text = 'Connecting...';
+        break;
 
-            case Teonet.status.online:
-              text = 'online';
-              break;
+      case Teonet.status.logining:
+        text = 'Logining';
+        break;
 
-            default:
-              text = '';
-        }
+      case Teonet.status.online:
+        text = 'online';
+        break;
 
-        return text;
+      default:
+        text = '';
     }
+
+    return text;
+  }
 }
 
 
 @NgModule({
-    declarations: [TeonetStatus]
-    ,imports: [BrowserModule]
+  declarations: [TeonetStatus]
+  , imports: [BrowserModule]
 })
 export class TeonetStatusModule {} // IgnoreModule

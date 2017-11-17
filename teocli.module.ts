@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-import {Injectable} from '@angular/core';
-import {TeonetAuth} from './teocli.auth';
+import { Injectable } from '@angular/core';
+import { TeonetAuth } from './teocli.auth';
 import Teocli from 'teocli/teocli';
 
 export interface TeonetEventType {
@@ -74,7 +74,7 @@ export class TeonetCli extends Teocli {
   static EVENT: TeonetEventType = {
     TEONET_INIT: 'teonet-init',
     TEONET_CLOSE: 'teonet-close'
-  };  
+  };
 
   constructor() {
 
@@ -96,19 +96,18 @@ export class TeonetCli extends Teocli {
   private init(): void {
 
     let authserver = new TeonetAuth(this);
-        
+
+    // When connected to websocket
     this.onopen = (ev) => {
       console.debug("TeonetCli::teocli.onopen");
 
-      // Send name login command to L0 server
+      // Prepare client name
       this.status = Teonet.status.logining;
       if (!this.client_name) {
-
         // Get name from local storage
         let user = authserver.storage.get();
         console.debug("TeonetCli::init user", user);
         if (user.remember_me && user.accessToken) {
-          //this.setClientName(user.userId + ':' + user.clientId);
           this.setClientName(user.accessToken);
         }
         // Set temporary name
@@ -116,7 +115,10 @@ export class TeonetCli extends Teocli {
           this.setClientName('teo-cli-ts-ws-' + Math.floor((Math.random() * 100) + 1));
         }
       }
+      
+      // Send login command to teonet L0 server
       this.login(this.client_name);
+      
       // Set reconnect timeout (reconnect if does not login during timeout
       setTimeout(() => {
         if (!this.isInit()) {
@@ -126,6 +128,8 @@ export class TeonetCli extends Teocli {
       }, this.INIT_TIMEOUT);
     };
 
+    // When disconnect from web socket (reconnect)
+    // Send 'teonet-close' to subscribers
     this.onclose = (ev) => {
       console.debug("TeonetCli::teocli.onclose");
       // Reconnect after timeout
@@ -149,8 +153,12 @@ export class TeonetCli extends Teocli {
       this.inited = false;
     };
 
+    // When get websocket error
     this.onerror = function (ev) {};
 
+    // When get 'onother' message fom webspcket. Check cmd 96 - teo-auth answer
+    // Send 'teonet-init' to subscribers
+    // Send 'onother' to subscribers
     this.onother = (err, data: object) => {
 
       console.debug("TeonetCli::onother", err, data);
@@ -159,15 +167,15 @@ export class TeonetCli extends Teocli {
       var d = <onotherData> data;
 
       // Check login answer
-      if (data && d.cmd === 96) {
+      if (d && d.cmd === 96) {
         console.debug("TeonetCli:: Got check login answer", d);
-        
-        // Set name 
+
+        // Set name
         this.setClientName(d.data.name);
-        
+
         // Get user from storage
         let user = authserver.storage.get();
-        
+
         // Send teocli-init event
         let sendEventInit = () => {
           this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
@@ -175,32 +183,34 @@ export class TeonetCli extends Teocli {
           this.inited = true;
           //$rootScope.networksItems = data.data.networks;
         };
-        
+
         // Login success
-        if (this.getClientName() == user.userId + ':' + user.clientId) {                    
+        if (this.getClientName() == user.userId + ':' + user.clientId) {
           sendEventInit();
-        } 
+        }
         
-        // Login if remember_me is set
         else {
+          // Login with saved email and password if remember_me is set
           if (user.remember_me) {
             //authserver.refresh(); // refresh auth token
-            authserver.login(user.email, user.password, (err: any, response: any) => {
-              if (err) {
-                // Goto Login screen
-                sendEventInit();
-                this.loginPage();
+            authserver.login(user.email, authserver.base64.decode(user.password), 
+              (err: any, response: any) => {
+                if (err) {
+                  // Goto Login screen
+                  sendEventInit();
+                  this.loginPage();
+                }
+                else {
+                  // Reconect with new client name
+                  user = authserver.getUser();
+                  this.setClientName(user.accessToken);
+                  this.disconnect();
+                }
               }
-              else {
-                // Reconect with new client name
-                user = authserver.getUser();
-                this.setClientName(user.accessToken);
-                this.disconnect();
-              }
-            });
+            );
           }
-          else {
-            // Goto Login screen
+          // Goto Login page
+          else {            
             sendEventInit();
             this.loginPage();
           }
@@ -213,12 +223,14 @@ export class TeonetCli extends Teocli {
       return processed;
     }
 
+    // Send 'onecho' to subscribers
     this.onecho = (err, data: object) => {
       console.debug("TeonetCli::onecho", err, data);
       this.sendEvent('onecho', data);
       return 1;
     }
 
+    // Send 'onclients' to subscribers
     this.onclients = (err, data: object) => {
       console.debug("TeonetCli::onclients", err, data);
       this.sendEvent('onclients', data);
@@ -233,14 +245,14 @@ export class TeonetCli extends Teocli {
   disconnect(): void {
     this.ws.close();
   }
-  
+
   /**
    * Sel login screen
    */
   setLoginPage(func:()=>void) {
     this.login_page = func;
   }
-  
+
   /**
    * Load login screen
    */
@@ -296,7 +308,7 @@ export class TeonetCli extends Teocli {
     this.eventSubscribers.push(func);
     return func;
   }
-  
+
   unsubscribe(func: eventSubscribersFunc): void {
 //    this.eventSubscribers.slice(
 //      this.eventSubscribers.findIndex((el)=>{
@@ -351,9 +363,8 @@ export class TeonetCli extends Teocli {
 };
 
 
-import {NgModule, Component} from '@angular/core';
+import {Component} from '@angular/core';
 import {AfterContentInit} from '@angular/core';
-import {BrowserModule} from '@angular/platform-browser';
 import {IntervalObservable} from 'rxjs/observable/IntervalObservable';
 
 import {TeonetClientsNum} from './teocli.clients';
@@ -478,7 +489,7 @@ export class TeonetStatus implements AfterContentInit {
             this.reconnect == 'true') {
             console.debug('TeonetStatus::IntervalObservable' +
                         '- disconnect from teonet, ' +
-                        '(current - this.last_answere) = ', 
+                        '(current - this.last_answere) = ',
                         (current - this.last_answere)
             );
             this.last_answere = 0;
@@ -601,10 +612,3 @@ export class TeonetStatus implements AfterContentInit {
     return text;
   }
 }
-
-
-@NgModule({
-  declarations: [TeonetStatus]
-  , imports: [BrowserModule]
-})
-export class TeonetStatusModule {} // IgnoreModule

@@ -136,11 +136,31 @@ export class TeonetStorage {
   constructor(private key: string) {}
   
   get() {
-    return JSON.parse( <string>localStorage.getItem(this.key));
+    let storage = JSON.parse( <string>localStorage.getItem(this.key));
+    if(!storage) storage = {};
+    return storage;
   }
   
   set(value: any) {
     localStorage.setItem(this.key, JSON.stringify(value));
+  }
+  
+  /**
+   * Update value in storage
+   */
+  update(key: string, value: any) {
+    var storage: any = this.get();
+    storage[key] = value;
+    this.set(storage);
+  }
+  
+  /**
+   * Delete value from storage
+   */
+  delete (key: string) {
+    var storage: any = this.get();
+    delete storage[key];
+    this.set(storage);
   }
 }
 
@@ -226,12 +246,12 @@ export class TeonetAuth {
   /**
    * Base64 class object to encode text
    */
-  private base64 = new Base64();
+  base64 = new Base64();
 
   /**
    * TeocliCrypto (based on CryptoJS) class object
    */
-  private teocliCrypto = new TeocliCrypto(CryptoJS);
+  teocliCrypto = new TeocliCrypto(CryptoJS);
   
   /**
    * TeonetStorage class object with key 'teonet_user'
@@ -260,6 +280,17 @@ export class TeonetAuth {
       }
     };
   }
+  
+  /**
+   * Replace all instances of a character in a string
+   * @param {string} txt Input string
+   * @return {string} Output string
+   */
+  private _humanText(txt: string) {
+    
+    txt = txt.replace(/_/g, ' ').toLowerCase();
+    return txt.substr(0, 1).toUpperCase() + txt.substr(1);;
+  }
 
   /**
    * Check websocker response error
@@ -273,7 +304,7 @@ export class TeonetAuth {
     if (err || response.status !== 200) {
 
       var REQUEST_FAILED = "Request failed";
-      if (response) callback(response.status, response.data || REQUEST_FAILED);
+      if (response) callback(response.status, response.data ? this._humanText(response.data) : REQUEST_FAILED);
       else callback(REQUEST_FAILED, REQUEST_FAILED);
 
       return true;
@@ -453,7 +484,8 @@ export class TeonetAuth {
 
       //this.$localStorage.user = response.data;
       this._extend(this.$localStorage.user, response.data);
-
+      this.storage.set(this.$localStorage.user);
+      
       // Delay before login/register to get time to save data to DataBase
       setTimeout(function () {
         callback(null, response.data);
@@ -527,7 +559,8 @@ export class TeonetAuth {
         var dec = this._decrypt(response.data.data, this.$localStorage.user.clientKey);
         //angular.extend($localStorage.user, JSON.parse(dec.toString()));
         this._extend(this.$localStorage.user, JSON.parse(dec.toString()));
-
+        this.storage.set(this.$localStorage.user);
+        
         // Save refresh time
         this._setRefreshTime();
 
@@ -603,9 +636,7 @@ export class TeonetAuth {
         var dec = this._decrypt(response.data.data, this.$localStorage.user.clientKey);
         //angular.extend($localStorage.user, JSON.parse(dec.toString()));
         this._extend(this.$localStorage.user, JSON.parse(dec.toString()));
-
-        console.log('TeonetAuth::login success $localStorage.user = ', this.$localStorage.user);
-        localStorage.setItem('teonet_user', JSON.stringify(this.$localStorage.user));
+        this.storage.set(this.$localStorage.user);
 
         this._setRefreshTime();
         callback(null, response || "Request success");
@@ -670,6 +701,8 @@ export class TeonetAuth {
       var dec = this._decrypt(response.data.data, this.$localStorage.user.clientKey);
       //angular.extend($localStorage.user, JSON.parse(dec.toString()));
       this._extend(this.$localStorage.user, JSON.parse(dec.toString()));
+      this.storage.set(this.$localStorage.user);
+      
       // Save refresh time
       this._setRefreshTime();
 
@@ -740,6 +773,7 @@ export class TeonetAuth {
         // Decrypt response data and extend user storage
         //var dec = this._decrypt(response.data.data, $localStorage.user.clientKey);
         //this._extend($localStorage.user, JSON.parse(dec.toString()));
+        //this.storage.set(this.$localStorage.user);
         callback(null, response || "Refresh success");
       };
       var error = function () {
@@ -807,6 +841,7 @@ export class TeonetAuth {
         // Decrypt response data and extend user storage
         //var dec = this._decrypt(response.data.data, $localStorage.user.clientKey);
         //this._extend($localStorage.user, JSON.parse(dec.toString()));
+        //this.storage.set(this.$localStorage.user);
         callback(null, response || "Change name success");
       };
       var error = function () {

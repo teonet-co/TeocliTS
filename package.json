@@ -7,19 +7,17 @@
     "test": "test"
   },
   "dependencies": {
-    "@angular/core": "4.4.4",
-    "@angular/common": "4.4.4",
-    "@angular/platform-browser": "4.4.4",
     "teocli": "0.0.16",
     "crypto-js": "3.1.8",
-    "@types/crypto-js": "^3.1.37"
+    "@types/crypto-js": "3.1.37"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "transpile": "ngc",
     "package": "rollup -c",
     "minify": "uglifyjs dist/bundles/teocli.umd.js --screw-ie8 --compress --mangle --comments --output dist/bundles/teocli.umd.min.js",
-    "build": "npm run transpile && npm run package && npm run minify && cp package_dist.json dist/package.json && cp README.md dist"
+    "build": "npm run transpile && npm run package && npm run minify && cp package_dist.json dist/package.json && cp README.md dist",
+    "prepare": "tsc"
   },
   "repository": {
     "type": "git",
@@ -32,6 +30,9 @@
   "author": "Kirill Scherba <kirill@scherba.ru> (http://gitlab.ksproject.org/)",
   "license": "MIT",
   "devDependencies": {
+    "@angular/core": "4.4.4",
+    "@angular/common": "4.4.4",
+    "@angular/platform-browser": "4.4.4",
     "@angular/compiler": "4.4.4",
     "@angular/compiler-cli": "4.4.4",
     "rollup": "0.49.2",

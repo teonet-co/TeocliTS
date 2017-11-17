@@ -22,8 +22,7 @@
  * THE SOFTWARE.
  */
 
-import {NgModule, Component, OnDestroy} from '@angular/core';
-import {BrowserModule} from '@angular/platform-browser';
+import {Component, OnDestroy} from '@angular/core';
 
 import {TeonetCli, Teonet, onotherData, onechoData} from './teocli.module';
 import {IntervalObservable} from 'rxjs/observable/IntervalObservable';
@@ -66,18 +65,23 @@ type clientInfo = {
   //  No: {{i+1}}/{{clients.length}}
   styles: ['\n\
         .teonet-clients-body {\n\
-            font-size: 85%;\n\
+            /*font-size: 85%;*/\n\
+        }\n\
+        .header {\n\
+          border: solid 1px #eee;\n\
+          font-size: 115%;\n\
+          padding: 2px 0;\n\
         }\n\
     '],
   template: '\n\
-        <div class="row item item-divider toolbar-background-md">\n\
+        <div class="row header item item-divider toolbar-background-md">\n\
           <div class="col col-10" col-1>№</div>\n\
           <div class="col">User name</div>\n\
           <div class="col">Client type</div>\n\
           <div class="col col-20 text-right" col-2 text-right>Ping</div>\n\
         </div>\n\
         \n\
-        <div class="teonet-clients-body row item" *ngFor="let client of clients; index as i; first as isFirst">\n\
+        <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" *ngFor="let client of clients; index as i; first as isFirst">\n\
           <div class="col col-10" col-1>{{i+1}}</div>\n\
           <div class="col"><a href="">{{(client.translate ? client.translate : client.name) | slice:0:15}}</a></div>\n\
           <div class="col">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
@@ -435,8 +439,8 @@ export class TeonetClientsNum implements OnDestroy {
   }
 }
 
-@NgModule({
-  declarations: [TeonetClients],
-  imports: [BrowserModule]
-})
-export class TeonetClientsModule {} // IgnoreModule
+//@NgModule({
+//  declarations: [TeonetClients],
+//  imports: [BrowserModule]
+//})
+//export class TeonetClientsModule {} // IgnoreModule

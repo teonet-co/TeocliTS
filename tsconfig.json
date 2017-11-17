@@ -1,31 +1,27 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "stripInternal": true,
+    "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
+    "lib": [
+      "dom",
+      "es2015"
+    ],
     "module": "es2015",
     "moduleResolution": "node",
-    "paths": {
-      "@angular/core": ["node_modules/@angular/core"]
-    },
-    "rootDir": ".",
-    "outDir": "dist",
     "sourceMap": true,
-    "inlineSources": true,
     "target": "es5",
-    "skipLibCheck": true,
-    "lib": [
-      "es2015", 
-      "dom"
-    ]
+    "outDir": "dist"
   },
-  "files": [
-    "index.ts"
+  "include": [
+    "./**/*.ts"
   ],
-  "angularCompilerOptions": {
-    "strictMetadataEmit": true
+  "exclude": [
+    "node_modules"
+  ],
+  "compileOnSave": false,
+  "atom": {
+    "rewriteTsconfig": false
   }
 }

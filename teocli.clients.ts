@@ -98,6 +98,7 @@ export class TeonetClients implements OnDestroy {
   clients: onclientDisplAr = [];
 
   private f: Array<any> = [];
+  private interval: any;
 
   constructor(public t: TeonetCli) {
 
@@ -239,9 +240,9 @@ export class TeonetClients implements OnDestroy {
     }));
 
     this.f.push(t.whenEvent('onecho', (data: any): number => {
-      
+
       if (!this.isComponentActive()) return 0;
-      
+
       var d: onechoData = data[0][0];
       console.debug('TeonetClients::onecho', data, d);
 
@@ -260,16 +261,18 @@ export class TeonetClients implements OnDestroy {
     }));
 
     //Send clients list request to L0 server
-    t.clients(Teonet.peer.l0);    
-    IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
+    t.clients(Teonet.peer.l0);
+    this.interval = IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
       this.n++;
       if (this.isComponentActive()) t.clients(Teonet.peer.l0);
     });
+
   }
 
   ngOnDestroy() {
     console.debug('TeonetClients::ngOnDestroy');
     for (let f of this.f) this.t.unsubscribe(f);
+    this.interval.unsubscribe();
   }
 
   private isComponentActive(): boolean {

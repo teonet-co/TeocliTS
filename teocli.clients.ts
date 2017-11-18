@@ -64,29 +64,29 @@ type clientInfo = {
   //
   //  No: {{i+1}}/{{clients.length}}
   styles: ['\n\
-        .teonet-clients-body {\n\
-            /*font-size: 85%;*/\n\
-        }\n\
-        .header {\n\
-          border: solid 1px #eee;\n\
-          font-size: 115%;\n\
-          padding: 2px 0;\n\
-        }\n\
-    '],
+    .teonet-clients-body {\n\
+        /*font-size: 85%;*/\n\
+    }\n\
+    .header {\n\
+      border: solid 1px #eee;\n\
+      font-size: 115%;\n\
+      padding: 2px 0;\n\
+    }\n\
+  '],
   template: '\n\
-        <div class="row header item item-divider toolbar-background-md">\n\
-          <div class="col col-10" col-1>№</div>\n\
-          <div class="col">User name</div>\n\
-          <div class="col">Client type</div>\n\
-          <div class="col col-20 text-right" col-2 text-right>Ping</div>\n\
-        </div>\n\
-        \n\
-        <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" *ngFor="let client of clients; index as i; first as isFirst">\n\
-          <div class="col col-10" col-1>{{i+1}}</div>\n\
-          <div class="col"><a href="">{{(client.translate ? client.translate : client.name) | slice:0:15}}</a></div>\n\
-          <div class="col">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
-          <div class="col col-20 text-right" col-2 text-right>{{(client.time ? client.time : "")}}</div>\n\
-        </div>\n'
+    <div class="row header item item-divider toolbar-background-md">\n\
+      <div class="col col-10" col-1>№</div>\n\
+      <div class="col">User name</div>\n\
+      <div class="col">Client type</div>\n\
+      <div class="col col-20 text-right" col-2 text-right>Ping</div>\n\
+    </div>\n\
+    \n\
+    <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" *ngFor="let client of clients; index as i; first as isFirst">\n\
+      <div class="col col-10" col-1>{{i+1}}</div>\n\
+      <div class="col"><a href="">{{(client.translate ? client.translate : client.name) | slice:0:15}}</a></div>\n\
+      <div class="col">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
+      <div class="col col-20 text-right" col-2 text-right>{{(client.time ? client.time : "")}}</div>\n\
+    </div>\n'
   //        <div class="text-center padding" ng-hide="clients.length">\n\
   //            <ion-spinner icon="lines"></ion-spinner>\n\
   //        </div>\n'
@@ -98,9 +98,13 @@ export class TeonetClients implements OnDestroy {
   clients: onclientDisplAr = [];
 
   private f: Array<any> = [];
-  private interval: any;
+  
+  private interval = IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
+    this.n++;
+    if (this.isComponentActive()) this.t.clients(Teonet.peer.l0);
+  });
 
-  constructor(public t: TeonetCli) {
+  constructor(private t: TeonetCli) {
 
     console.debug('TeonetClients::constructor');
 
@@ -118,86 +122,88 @@ export class TeonetClients implements OnDestroy {
 
       let need_sort = false;
       let d = <onclientsData>(data[0][0]);
-      console.debug('TeonetClients::onclients', data, d, this.clients);
+      if (d.from == Teonet.peer.l0) {
+        console.debug('TeonetClients::onclients', data, d, this.clients);
 
-      // Remove not existing (disconnected) clients
-      let clients = this.clients.filter(
-        function (x) {
-          return d.data.client_data_ar.inArray(
-            function (e) {
-              return x.name === e.name;
-            },
-            function () {}
-          );
-        }
-      );
-      if (clients.length != this.clients.length) {
-        this.clients = clients;
-        //need_sort = true;
-      }
-
-      // Add new clients to clients array
-      for (let client of d.data.client_data_ar) {
-
-        let el: onclientDisplArEl = {
-          name: client.name,
-          translate: '',
-          type: '',
-          time: 0
-        };
-        this.clients.pushIfNotExist(
-          // Client to add
-          el,
-          // Comparer
-          function (currentElement: onclientDisplArEl) {
-            return currentElement.name === el.name;
-          },
-          // Done
-          (currentElement: onclientDisplArEl) => {
-            console.debug('TeonetClients::pushIfNotExist Add element:',
-              currentElement);
-
-            // Send user_info & client_info requests
-            let name_split = currentElement.name.split(':');
-            if (name_split[0]) {
-              this.sendUserInfo(name_split[0]);
-            }
-            if (name_split[1]) {
-              this.sendClientInfo(name_split[1]);
-            }
-
-            need_sort = true;
-          },
-          // Exists
-          function (currentElement: onclientDisplArEl) {
-            console.debug('TeonetClients::pushIfNotExist Element exists:',
-              currentElement);
+        // Remove not existing (disconnected) clients
+        let clients = this.clients.filter(
+          function (x) {
+            return d.data.client_data_ar.inArray(
+              function (e) {
+                return x.name === e.name;
+              },
+              function () {}
+            );
           }
         );
+        if (clients.length != this.clients.length) {
+          this.clients = clients;
+          //need_sort = true;
+        }
 
-        // Send ping to client
-        if (client.name != t.getClientName())
-          t.echo(client.name, 'Hello from contact page n = ' + this.n);
+        // Add new clients to clients array
+        for (let client of d.data.client_data_ar) {
 
+          let el: onclientDisplArEl = {
+            name: client.name,
+            translate: '',
+            type: '',
+            time: 0
+          };
+          this.clients.pushIfNotExist(
+            // Client to add
+            el,
+            // Comparer
+            function (currentElement: onclientDisplArEl) {
+              return currentElement.name === el.name;
+            },
+            // Done
+            (currentElement: onclientDisplArEl) => {
+              console.debug('TeonetClients::pushIfNotExist Add element:',
+                currentElement);
+
+              // Send user_info & client_info requests
+              let name_split = currentElement.name.split(':');
+              if (name_split[0]) {
+                this.sendUserInfo(name_split[0]);
+              }
+              if (name_split[1]) {
+                this.sendClientInfo(name_split[1]);
+              }
+
+              need_sort = true;
+            },
+            // Exists
+            function (currentElement: onclientDisplArEl) {
+              console.debug('TeonetClients::pushIfNotExist Element exists:',
+                currentElement);
+            }
+          );
+
+          // Send ping to client
+          if (client.name != t.getClientName())
+            t.echo(client.name, 'Hello from contact page n = ' + this.n);
+
+        }
+
+        // Sort clients array
+        if (need_sort) {
+          this.clients.sort(function (a, b) {
+            return a.name == b.name ? (a.type == b.type ? 0 :
+              (a.type < b.type ? -1 : 1)) : (a.name < b.name ? -1 : 1);
+          });
+        }
       }
-
-      // Sort clients array
-      if (need_sort)
-        this.clients.sort(function (a, b) {
-          return a.name == b.name ? (a.type == b.type ? 0 :
-            (a.type < b.type ? -1 : 1)) : (a.name < b.name ? -1 : 1);
-        });
-
+      
       return 0;
     }));
 
     this.f.push(t.whenEvent('onother', (data: any): number => {
 
       var d: onotherData = data[0][0];
-      console.debug('TeonetClients::onother', data, d);
-
       // Process ansewers from teo-auth
       if (d.from == Teonet.peer.auth) {
+        console.debug('TeonetClients::onother', data, d);
 
         // Process user_info # 133
         if (d.cmd == 133) {
@@ -260,13 +266,8 @@ export class TeonetClients implements OnDestroy {
       return 0;
     }));
 
-    //Send clients list request to L0 server
+    // Send clients list request to L0 server
     t.clients(Teonet.peer.l0);
-    this.interval = IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
-      this.n++;
-      if (this.isComponentActive()) t.clients(Teonet.peer.l0);
-    });
-
   }
 
   ngOnDestroy() {
@@ -326,12 +327,12 @@ export class TeonetClientsNum implements OnDestroy {
     }));
 
     this.f.push(t.whenEvent('onother', (data: any): number => {
-
       let d: onotherData = data[0][0];
-      console.debug('TeonetClientsNum::onother', data, d);
-
-      // Process clients number responces
-      this.processClientsNum(d);
+      if(d.from == Teonet.peer.l0) {
+        console.debug('TeonetClientsNum::onother', data, d);        
+        // Process clients number responces
+        this.processClientsNum(d); 
+      }
       return 0;
     }));
   }
@@ -394,10 +395,8 @@ export class TeonetClientsNum implements OnDestroy {
     }
 
     if (processed) {
-
       console.debug("TeonetClientsNum::processClientsNum, data:",
         data, "client:", client, "client_code:", client_code);
-
       this.num_clients = clientsNumber;
     }
 
@@ -441,9 +440,3 @@ export class TeonetClientsNum implements OnDestroy {
     }
   }
 }
-
-//@NgModule({
-//  declarations: [TeonetClients],
-//  imports: [BrowserModule]
-//})
-//export class TeonetClientsModule {} // IgnoreModule

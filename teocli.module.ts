@@ -71,6 +71,8 @@ export class TeonetCli extends Teocli {
   private isTeonetClientsActiveFunc: () => boolean;
   private eventSubscribers: Array<eventSubscribersFunc>;
   private login_page: any;
+  private signup_page: any;
+  private restore_page: any;  
   static EVENT: TeonetEventType = {
     TEONET_INIT: 'teonet-init',
     TEONET_CLOSE: 'teonet-close'
@@ -174,10 +176,10 @@ export class TeonetCli extends Teocli {
         this.setClientName(d.data.name);
 
         // Get user from storage
-        let user = authserver.storage.get();
+        const user = authserver.storage.get();
 
         // Send teocli-init event
-        let sendEventInit = () => {
+        const sendEventInit = () => {
           this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
           this.status = Teonet.status.online;
           this.inited = true;
@@ -202,8 +204,7 @@ export class TeonetCli extends Teocli {
                 }
                 else {
                   // Reconect with new client name
-                  user = authserver.getUser();
-                  this.setClientName(user.accessToken);
+                  this.setClientName(authserver.getUser().accessToken);
                   this.disconnect();
                 }
               }
@@ -247,22 +248,56 @@ export class TeonetCli extends Teocli {
   }
 
   /**
-   * Sel login screen
+   * Sel login page
    */
   setLoginPage(func:()=>void) {
     this.login_page = func;
   }
 
   /**
-   * Load login screen
+   * Load Login page
    */
-  loginPage() {
-    if (this.login_page) this.login_page();
+  loginPage(push: boolean = undefined) {
+    if (this.login_page) this.login_page(push);
     else {
-      alert('TODO: Login screen is udefined!');
+      alert('TODO: Login page is udefined!');
     }
   }
+  
+  /**
+   * Sel SignUp page
+   */
+  setSignupPage(func:()=>void) {
+    this.signup_page = func;
+  }
+  
+  /**
+   * Load SignUp page
+   */
+  signupPage(push: boolean = undefined) {
+    if (this.signup_page) this.signup_page(push);
+    else {
+      alert('TODO: SignUp page is udefined!');
+    }
+  }
+  
+  /**
+   * Sel Restore page
+   */
+  setRestorePage(func:()=>void) {
+    this.restore_page = func;
+  }
 
+  /**
+   * Load Restore page
+   */
+  restorePage(push: boolean = undefined) {
+    if (this.restore_page) this.restore_page(push);
+    else {
+      alert('TODO: Restore page is udefined!');
+    }
+  }
+  
   /**
    * Is TeonetCli connected and initialized
    *

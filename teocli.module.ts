@@ -28,6 +28,7 @@ import Teocli from 'teocli/teocli';
 
 export interface TeonetEventType {
   TEONET_INIT: string,
+  TEONET_LOGGEDIN: string,
   TEONET_CLOSE: string
 };
 
@@ -75,7 +76,8 @@ export class TeonetCli extends Teocli {
   private restore_page: any;  
   static EVENT: TeonetEventType = {
     TEONET_INIT: 'teonet-init',
-    TEONET_CLOSE: 'teonet-close'
+    TEONET_CLOSE: 'teonet-close',
+    TEONET_LOGGEDIN: 'teonet-loggedin'
   };
 
   constructor() {
@@ -179,16 +181,17 @@ export class TeonetCli extends Teocli {
         const user = authserver.storage.get();
 
         // Send teocli-init event
-        const sendEventInit = () => {
+        const sendEventInit = (loggedin = false) => {
           this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
           this.status = Teonet.status.online;
           this.inited = true;
+          if(loggedin) this.sendEvent(TeonetCli.EVENT.TEONET_LOGGEDIN);
           //$rootScope.networksItems = data.data.networks;
         };
 
         // Login success
         if (this.getClientName() == user.userId + ':' + user.clientId) {
-          sendEventInit();
+          sendEventInit(true);
         }
         
         else {

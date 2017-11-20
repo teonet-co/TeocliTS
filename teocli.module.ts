@@ -60,11 +60,13 @@ export const Teonet = {
   }
 }
 
+import { TeocliRTC } from './teocli.webrtc';
+
 @Injectable()
-export class TeonetCli extends Teocli {
+export class TeonetCli extends TeocliRTC {
 
   status: number;
-  private client_name: string;
+  //private client_name: string;
   private connect_url: string;
   private inited: boolean;
   private RECONNECT_TIMEOUT: number;
@@ -347,11 +349,12 @@ export class TeonetCli extends Teocli {
     return func;
   }
 
+  /**
+   * Unsubscribe from event
+   * 
+   * @param {eventSubscribersFunc} func
+   */
   unsubscribe(func: eventSubscribersFunc): void {
-//    this.eventSubscribers.slice(
-//      this.eventSubscribers.findIndex((el)=>{
-//        return el == func;
-//      }), 1);
     this.eventSubscribers = this.eventSubscribers.filter(f => f !== func);
   }
 

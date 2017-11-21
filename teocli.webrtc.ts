@@ -29,24 +29,21 @@
  *
  */
 
-import { TeocliCrypto } from 'teocli/teocli.crypto';
-import { Base64 } from './teocli.auth';
-import * as CryptoJS from 'crypto-js';
-
 import Teocli from 'teocli/teocli';
-import 'peerjs/dist/peer';
 
+import 'peerjs/dist/peer';
 declare var Peer: any;
 
-class TeocliRTCMap {
+export class TeocliRTCMap {
 
-  map: any = {};
+  private map: any = {};
 
   /**
    * Add to map
    */
   add(key: string, conn: any = undefined, data: any = {}) {
     //if (!this.exist(key)) {
+    if(key)
     this.map[key] = { conn: conn, data: data };
     //}
   }
@@ -63,15 +60,26 @@ class TeocliRTCMap {
    */
   connected(key: string) {
     return this.get(key);
-  }  
-  
+  }
+
   /**
    * Get connection
    */
   get(key: string) {
     let data = this.map[key];
     return data ? data.conn : undefined;
-  }    
+  }
+
+  /**
+   * Delete key from map
+   */
+  delete(key: string) {
+    delete this.map[key];
+  }
+  
+  getMap() {
+    return this.map;
+  }
 }
 
 export class TeocliRTC extends Teocli {
@@ -79,91 +87,107 @@ export class TeocliRTC extends Teocli {
   private peer: any;
   protected client_name: string;
   private map = new TeocliRTCMap();
-  private teocliCrypto = new TeocliCrypto(CryptoJS);
-  private base64 = new Base64();
-  
-  private _crypt(key: string) {
-    //return this.base64.encode(this.teocliCrypto.hash_short(key));
-    return this.teocliCrypto.hash_short(key);
-  }
 
   constructor(ws: WebSocket) {
     super(ws);
-    console.log('TeocliRTC::constructor');
+
+    console.log('TeocliRTC::constructor this.client_name:', this.client_name);
     
-    setTimeout(() => {
-      
-      let hash = this._crypt(this.client_name);
-      console.log('TeocliRTC::constructor this.client_name:', this.client_name, hash);
-      this.peer = new Peer(hash, {key: 'dfsepa5n3o2vgqfr'});
-      
-      setTimeout(() => {
-        console.log('TeocliRTC::constructor this.peer.id:', this.peer.id);
-      }, 3000);
-      
-      this.peer.on('connection', (conn: any) => {
-        console.log('TeocliRTC::constructor this peer - on connection', conn);
-        // \TODO Add peer to map
-        let n = 0, from: string;
-        conn.on('data', (data: any) => {
-          console.log('TeocliRTC::constructor this peer - on data n = ' + n + ':', data);
-          if (!n && !this.map.connected(data)) {
-//           this.map.add(data, conn);
-           from = data;
-          } 
-          else {
-            let d = JSON.parse(data);
-            d.from = from;
-            //delete d.to;
-            console.log(d);
-            this.process(JSON.stringify(d));
+    this.peer = new Peer({key: 'dfsepa5n3o2vgqfr'});
+
+//    setTimeout(() => {
+//      console.log('TeocliRTC::constructor Got this.peer.id:', this.peer.id);
+//    }, 3000);
+
+    // On connected to this peer
+    this.peer.on('connection', (conn: any) => {
+      console.log('TeocliRTC::constructor on connection', conn);
+      let n = 0, key: string;
+      // Process data
+      conn.on('data', (data: any) => {
+        // First message is peer name
+        if (!n) {
+          if(!this.map.connected(data)) {
+            console.log('TeocliRTC::constructor Connected to:', data);
+            this.map.add(data, conn);  // Connected
+            key = data // Set key (from)
           }
-          n++;
-        });
-      });    
-      
-      }, 3000);
-        
-//    }, 3000);    
+        }
+        // Process received data
+        else this.process(data);
+        n++;
+      });
+      // Process disconnect
+      conn.on('close', () => {
+        console.log('TeocliRTC::constructor Disconnected from:', key);
+        this.map.delete(key);
+      });
+    });
   }
 
   /**
    * Send by Teocli or WebRTC
    */
   send(data: any): boolean {
-    var retval = true;
+    var conn, retval = true;
     var d: any = (typeof data == 'string') ? JSON.parse(data) : data;
-    console.debug('TeocliRTC::send to:', data, d.to);
-    let conn;
-    if ((conn = this.map.get(d.to))) conn.send(data); // Send by WebRTC 
+    if ((conn = this.map.get(d.to))) {
+      d.from = this.client_name;
+      conn.send(JSON.stringify(d)); // Send by WebRTC
+    }
     else {
       retval = super.send(data);                      // Send by Teocli
-      if (!this.map.exist(d.to)) this.connect(d.to);  // Try connect by WebRTC
+      if (!this.map.exist(d.to)) this.sendRTC(d.to);  // Send RTC request
     }
     return retval;
   }
 
   /**
-   * RTC data connect with peer
+   * Send RTC request to peer
    */
-  connect(key: string) {
+  private sendRTC(peer: string) {
     if(this.peer && this.peer.id) {
-      super.send(JSON.stringify({ cmd: 255, to: key, data: { peer_id: this.peer.id } }));
-      var conn = this.peer.connect(this._crypt(key));
-      console.log('TeocliRTC::connect this peer id: ' + this.peer.id + ' connecting to ' + key + ' ...');
-      this.map.add(key);
+      this.map.add(peer); // Known peer (request was send)
+      super.send(JSON.stringify({ cmd: 255, to: peer, data: { peer_id: this.peer.id }}));
+    }
+  }
+
+  /**
+   * RTC data connect with peer (as answer to RTC request)
+   */
+  private connect(key: string, peer_id: string) {
+    if(this.peer && this.peer.id) {
+      var conn = this.peer.connect(peer_id); 
+      console.log('TeocliRTC::connect  connecting to ' + key + ' ...');
+      // On connected to remote peer
       conn.on('open', () => {
-        console.log('TeocliRTC::connect connected to ' + key + ' ...');
-        this.map.add(key, conn);
+        console.log('TeocliRTC::connect Connected to: ' + key);
+        this.map.add(key, conn); // Connected
         conn.send(key);
-        conn.on('data', (data: any) => {
-          console.log('TeocliRTC::connect - on data:', data);          
+        conn.on('data', this.process);
+        conn.on('close', () => {
+          console.log('TeocliRTC::connect Disconnect from:', key);
+          this.map.delete(key);
         });
       });
     }
   }
+
+  /**
+   * Process RTC command (cmd = 255)
+   */
+  onrtc(err:any, p: any) {
+    if(!err) {
+      console.log('TeocliRTC::onrtc Got cmd 255');
+      if (!this.map.connected(p.from)) this.connect(p.from, p.data.peer_id);
+    }
+    return 1;
+  }
   
-//  process(data: any) {
-//    
-//  }
+  /**
+   * Return pointer to Teonet WebRTC map
+   */
+  getWebRTCMap() {
+    return this.map.getMap();
+  }
 }

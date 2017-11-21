@@ -38,18 +38,52 @@ type onclientsData = {
     client_data_ar: onclientsDataAr
   }
 };
-type userInfo = {
+export type TeonetUserInfo = {
   userId: string,
   username: string,
   email: string
 };
-type clientInfo = {
+export type TeonetClientInfo = {
   clientId: string,
   registerDate: Date,
   data: {
     type: string;
   }
 };
+
+export class TeonetClientsRequest {
+  
+  constructor(private t: TeonetCli) {}
+  
+  /**
+   * Send user info request
+   *
+   * @param {string} name Clients accessToken
+   * @returns {undefined}
+   */
+  sendUserInfo (name: string) {
+
+    console.debug("TeonetCli.send_user_info_request", name);
+
+    //if(teocli !== undefined)
+    this.t.send('{ "cmd": 132, "to": "' + Teonet.peer.auth + '", "data": ["' + name + '"] }');
+  }
+
+  /**
+   * Send clients info request
+   *
+   * @param {type} client
+   * @returns {undefined}
+   */
+  sendClientInfo(client: string) {
+
+    console.debug("ClientsController.send_client_info_request", client);
+
+    //if(teocli !== undefined)
+    this.t.send('{ "cmd": 134, "to": "' + Teonet.peer.auth + '", "data": ["' + client + '"] }');
+  }
+    
+}
 
 @Component({
   selector: 'teonet-clients',
@@ -98,6 +132,7 @@ export class TeonetClients implements OnDestroy {
   clients: onclientDisplAr = [];
 
   private f: Array<any> = [];
+  private cli = new TeonetClientsRequest(this.t);
   
   private interval = IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
     this.n++;
@@ -164,12 +199,8 @@ export class TeonetClients implements OnDestroy {
 
               // Send user_info & client_info requests
               let name_split = currentElement.name.split(':');
-              if (name_split[0]) {
-                this.sendUserInfo(name_split[0]);
-              }
-              if (name_split[1]) {
-                this.sendClientInfo(name_split[1]);
-              }
+              if (name_split[0]) this.cli.sendUserInfo(name_split[0]);
+              if (name_split[1]) this.cli.sendClientInfo(name_split[1]);
 
               need_sort = true;
             },
@@ -208,7 +239,7 @@ export class TeonetClients implements OnDestroy {
         // Process user_info # 133
         if (d.cmd == 133) {
 
-          let user: userInfo = d.data;
+          let user: TeonetUserInfo = d.data;
 
           this.clients.inArray(
             // Comparer
@@ -226,7 +257,7 @@ export class TeonetClients implements OnDestroy {
         // Process client_info # 135
         else if (d.cmd == 135) {
 
-          let client: clientInfo = d.data;
+          let client: TeonetClientInfo = d.data;
           console.debug('TeonetClients::onother got client typt:', client.data.type);
 
           this.clients.inArray(
@@ -282,33 +313,7 @@ export class TeonetClients implements OnDestroy {
 
   // Clients auth requests ---------------------------------------------------
 
-  /**
-   * Send user info request
-   *
-   * @param {string} name Clients accessToken
-   * @returns {undefined}
-   */
-  private sendUserInfo(name: string) {
-
-    console.debug("TeonetCli.send_user_info_request", name);
-
-    //if(teocli !== undefined)
-    this.t.send('{ "cmd": 132, "to": "' + Teonet.peer.auth + '", "data": ["' + name + '"] }');
-  }
-
-  /**
-   * Send clients info request
-   *
-   * @param {type} client
-   * @returns {undefined}
-   */
-  private sendClientInfo(client: string) {
-
-    console.debug("ClientsController.send_client_info_request", client);
-
-    //if(teocli !== undefined)
-    this.t.send('{ "cmd": 134, "to": "' + Teonet.peer.auth + '", "data": ["' + client + '"] }');
-  }
+  
 }
 
 export class TeonetClientsNum implements OnDestroy {

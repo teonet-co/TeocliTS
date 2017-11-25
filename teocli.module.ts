@@ -24,7 +24,7 @@
 
 import { Injectable } from '@angular/core';
 import { TeonetAuth } from './teocli.auth';
-import Teocli from 'teocli/teocli';
+import { TeocliRTC } from './teocli.webrtc2';
 
 export interface TeonetEventType {
   TEONET_INIT: string,
@@ -60,13 +60,11 @@ export const Teonet = {
   }
 }
 
-import { TeocliRTC } from './teocli.webrtc';
-
 @Injectable()
 export class TeonetCli extends TeocliRTC {
 
   status: number;
-  //private client_name: string;
+  protected client_name: string;
   private connect_url: string;
   private inited: boolean;
   private RECONNECT_TIMEOUT: number;
@@ -249,6 +247,7 @@ export class TeonetCli extends TeocliRTC {
    *
    */
   disconnect(): void {
+    super.disconnect();
     this.ws.close();
   }
 

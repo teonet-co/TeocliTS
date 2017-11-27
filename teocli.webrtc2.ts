@@ -197,11 +197,28 @@ export class TeocliRTCSignalingChannel extends Teocli {
     return 1;
   }
 
-
-  // Disconnect all channels when teonet disconnected
-  disconnect() {
-    this.map.deleteAll();
+  /**
+   * Get WebRTC map
+   * @return {any} Pointer to Teonet WebRTC map
+   */
+  getWebRTCMap() {
+    return this.map.getMap();
   }
+  
+  /**
+   * Destroy all connections.
+   * Interception Send event to Event Subscribers
+   *
+   * @param {string} ev Event name
+   * @param {object[]) ...obj Objects send to subscribers
+   */  
+  sendEvent(ev: string, ...obj: object[]): void {    
+    // Disconnect all channels when teonet disconnected
+    if(ev == 'teonet-close') {
+      console.log('TeocliRTCSignalingChannel::sendEvent ', 'teonet-close', obj);
+      this.map.deleteAll();
+    }
+  }  
 }
 
 export class TeocliRTC extends TeocliRTCSignalingChannel {

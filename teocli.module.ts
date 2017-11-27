@@ -247,7 +247,6 @@ export class TeonetCli extends TeocliRTC {
    *
    */
   disconnect(): void {
-    super.disconnect();
     this.ws.close();
   }
 
@@ -358,7 +357,7 @@ export class TeonetCli extends TeocliRTC {
   }
 
   /**
-   * Send event to Event Subscriber
+   * Send event to Event Subscribers
    *
    * @param {string} ev Event name
    * @param {object[]) ...obj Objects send to subscribers
@@ -367,6 +366,7 @@ export class TeonetCli extends TeocliRTC {
     for (var func of this.eventSubscribers) {
       func(ev, obj);
     }
+    super.sendEvent(ev, obj);  // Send event to parrent class
   }
 
   whenEvent(event: string, func: (...obj: object[]) => number) {

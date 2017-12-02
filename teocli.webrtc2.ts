@@ -103,7 +103,10 @@ export class TeocliRTCMap {
   delete(key: string) {
     if(key && this.map[key]) {
       this.deleteChannel(key); // Close and delete data cannel
-      if(this.map[key].pc) delete this.map[key].pc // Delete connection
+      if(this.map[key].pc) {
+        this.map[key].pc.close(); // Closes the peer connection.
+        delete this.map[key].pc // Delete connection
+      }
       delete this.map[key]; // Delete key
     }
   }
@@ -123,13 +126,15 @@ export class TeocliRTCMap {
   }
 }
 
+export type CallOptionsType = { video: boolean, audio: boolean, chat: boolean };
+
 export class TeocliRTCSignalingChannel extends Teocli {
 
   protected client_name: string;
   private map = new TeocliRTCMap();
 
-  protected oncandidate  = (peer: string) => {};
-  protected onrtcmessage = (peer: string, evt: any) => {};
+  protected oncandidate  = <(peer: string) => void> {};
+  protected onrtcmessage = <(peer: string, evt: any) => void> {};
 
   /**
    * Start peer connection - Create new key in the RTC map
@@ -169,6 +174,44 @@ export class TeocliRTCSignalingChannel extends Teocli {
   }
 
   /**
+   * Add stream to RTCConnection
+   */
+  protected addStream (pc: any, stream: any, options?: any) {
+
+    if (!options) {
+      stream.getTracks().forEach(
+        function(track: any) {
+          pc.addTrack(track, stream);
+        }
+      );
+    }
+    else {
+      if (options.video) pc.addTrack(stream.getVideoTracks()[0], stream);
+      if (options.audio) pc.addTrack(stream.getAudioTracks()[0], stream);
+    }
+    console.log('Added local stream to pc');
+  }
+
+  /**
+   * Get WebRTC map
+   * @return {any} Pointer to Teonet WebRTC map
+   */
+  getWebRTCMap() {
+    return this.map.getMap();
+  }
+
+  /**
+   * Process RTC command (cmd = 255)
+   */
+  onrtc(err: any, p: any) {
+    if (!err) {
+      //console.log('TeocliRTCSignalingChannel::onrtc Got cmd 255');
+      this.onrtcmessage(p.from, p)
+    }
+    return 1;
+  }
+
+  /**
    * Send teonet message by Teocli or WebRTC
    */
   send(data: any): boolean {
@@ -187,48 +230,43 @@ export class TeocliRTCSignalingChannel extends Teocli {
   }
 
   /**
-   * Process RTC command (cmd = 255)
-   */
-  onrtc(err: any, p: any) {
-    if (!err) {
-      //console.log('TeocliRTCSignalingChannel::onrtc Got cmd 255');
-      this.onrtcmessage(p.from, p)
-    }
-    return 1;
-  }
-
-  /**
-   * Get WebRTC map
-   * @return {any} Pointer to Teonet WebRTC map
-   */
-  getWebRTCMap() {
-    return this.map.getMap();
-  }
-  
-  /**
    * Destroy all connections.
    * Interception Send event to Event Subscribers
    *
    * @param {string} ev Event name
    * @param {object[]) ...obj Objects send to subscribers
-   */  
-  sendEvent(ev: string, ...obj: object[]): void {    
+   */
+  sendEvent(ev: string, ...obj: object[]): void {
     // Disconnect all channels when teonet disconnected
     if(ev == 'teonet-close') {
       console.log('TeocliRTCSignalingChannel::sendEvent ', 'teonet-close', obj);
       this.map.deleteAll();
     }
   }  
+
+  /**
+   * Convert WebRTCNap to Array
+   */
+  webrtcToAr(webrtc: any) {
+    return Object.keys(webrtc).map((key) => {
+      return { key: key, data: webrtc[key] };
+    });
+  }
 }
 
 export class TeocliRTC extends TeocliRTCSignalingChannel {
 
+  // RTC configurations (ICE Servers)
   private configuration = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302'},
       { urls: 'turn:turn.bistri.com:80', username: 'homeo', credential: 'homeo' }
     ]
   };
+  
+  // Cakback registered by VideoCall Page called when remote peer connect it's 
+  // tracks: When remote peer make call to this local peer
+  private callAnswer:  any; 
 
   /**
    * TeocliRTC class constructor
@@ -252,7 +290,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     }
     else this.logError({ name: 'TeocliRTC::connect', message: 'Empty peer name' });
   }
-
+  
   /**
    * Process remote peer RTC signal messages
    */
@@ -270,11 +308,20 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       var desc = message.desc;
 
       // teocli message to quick create this connection
-      if (desc.type == "start") {
+      if (desc.type == 'teocli-start') {
         // Do something ...
       }
+      // teocli message to connect media streams
+      else if (desc.type == 'teocli-call') {
+        // \TODO What do with audioSender and videoSender
+        console.log('Got RTC teocli-call signal from peer: ' + peer + ', signal:', message);
+//        if (this.localStream) {
+//          this.addStream(pc, this.localStream);
+//        }
+      }
       // if we get an offer, we need to reply with an answer
-      else if (desc.type == "offer") {
+      else if (desc.type == 'offer') {
+        console.log('Got offer', message);
         pc.setRemoteDescription(desc)
           .then(() => {
             return pc.createAnswer();
@@ -289,10 +336,26 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
           .catch(this.logError);
       }
       // process remote description
-      else pc.setRemoteDescription(desc).catch(this.logError);
+      else {
+        console.log('message', message);
+        pc.setRemoteDescription(desc).catch(this.logError);
+      }
+    }
+    else if (message.start) {
+      console.log('Got start message', message);
+//      started = true;
+//      if (audio && audioSendTrack) {
+//        audio.sender.replaceTrack(audioSendTrack);
+//      }
+//      if (video && videoSendTrack) {
+//        video.sender.replaceTrack(videoSendTrack);
+//      }
     }
     // process ice candidate
-    else pc.addIceCandidate(message.candidate).catch(this.logError);
+    else {
+      console.log('Got ice candidate', message);
+      pc.addIceCandidate(message.candidate).catch(this.logError);
+    }
   }
 
     /**
@@ -307,7 +370,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     console.log('TeocliRTC::createConnection to:', peer, 'initiator:', isInitiator);
     this.startConnection(peer, pc);  // Add RTCPeerConnection to RTC map
-    this.sendRTC(peer, { desc: { type: 'start' } }); // Send start commad to receiver
+    this.sendRTC(peer, { desc: { type: 'teocli-start' } }); // Send start commad to receiver
 
     // send any ice candidates to the other peer
     pc.onicecandidate = (evt: any) => {
@@ -317,6 +380,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     // let the "negotiationneeded" event trigger offer generation
     pc.onnegotiationneeded = () => {
+      console.log('createConnection::onnegotiationneeded createOffer');
       pc.createOffer()
         .then((offer: any) => {
           return pc.setLocalDescription(offer);
@@ -328,6 +392,13 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         })
         .catch(this.logError);
     };
+
+    // when remote peer connect his media'messa
+    pc.ontrack = (e: any) => {
+      console.log('pc.ontrack', e);
+      // Connect remote stream to the remoteVideo control
+      if (this.callAnswer) this.callAnswer(peer, e.streams[0]);
+    }
 
     // Process created channel
     var processChannel = (channel: any) => {
@@ -346,6 +417,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       channel.onclose = () => {
         console.log('TeocliRTC::createConnection:onclose', peer);
         this.removeConnection(peer);
+        if (this.callAnswer) this.callAnswer(peer);
       }
       // When channel error
       channel.onerror = () => {
@@ -377,4 +449,84 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   private logError(error: any) {
     console.log('TeocliRTC::logError', error.name + ": " + error.message);
   }
+  
+  /**
+   * Make Call to remote peer
+   *
+   * @param {string} peer Peer name
+   * @param {CallOptionsType} options Options: 
+   *                            video - reqiest video, 
+   *                            audio - request audio, 
+   *                            chat - request chat channel
+   * 
+   * @return {boolean} true if call send to remotepeer;
+   *                   false if peer name empty,
+   *                   or peer not connected to this host,
+   *                   or if wrong options send (all: video, audio and channel is false)
+   */
+  call (peer: string,
+       localStream?: any,
+       options: CallOptionsType = { video: true, audio: true, chat: false },
+       ) {
+
+    // Check option and return false if all options lalse
+    if (!(options.video || options.audio || options.chat)) return false;
+
+    var pc = this.getConnection(peer);
+    if (pc) {
+
+      // Add local tracks to RTC connection
+      if (localStream) {
+        this.addStream(pc, localStream, options);
+        pc.onremovestream = () => {
+          if (this.callAnswer) this.callAnswer(peer);
+          this.removeTracks(peer);
+        }
+      }
+
+      // \TODO Create Chat channel
+      if (options.chat) { }
+
+      return true;
+    }
+
+    return false;
+  }
+  
+  /**
+   * Hangup call
+   */
+  hangup(peer: string) {
+    //this.removeConnection(peer);
+    this.removeTracks(peer);    
+  }
+
+  /**
+   * Register remote call answer
+   */
+  registerCallAnswer(callAnswer: any) {
+    this.callAnswer = callAnswer;
+  }
+  
+  /**
+   * Remove all tracks from connection
+   */
+  removeTracks(peer: string) {
+    var pc = this.getConnection(peer);
+    if (pc) {
+      [/*pc.getReceivers(), */pc.getSenders()].forEach((tracks:any) => {
+        tracks.forEach((track: any) => {
+          pc.removeTrack(track);
+        });
+      });
+    }
+  }
+
+  /**
+   * UnRegister remote call answer
+   */
+  unRegisterCallAnswer() {
+    this.callAnswer = undefined;
+  }
+
 }

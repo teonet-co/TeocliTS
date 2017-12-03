@@ -174,25 +174,6 @@ export class TeocliRTCSignalingChannel extends Teocli {
   }
 
   /**
-   * Add stream to RTCConnection
-   */
-  protected addStream (pc: any, stream: any, options?: any) {
-
-    if (!options) {
-      stream.getTracks().forEach(
-        function(track: any) {
-          pc.addTrack(track, stream);
-        }
-      );
-    }
-    else {
-      if (options.video) pc.addTrack(stream.getVideoTracks()[0], stream);
-      if (options.audio) pc.addTrack(stream.getAudioTracks()[0], stream);
-    }
-    console.log('Added local stream to pc');
-  }
-
-  /**
    * Get WebRTC map
    * @return {any} Pointer to Teonet WebRTC map
    */
@@ -281,7 +262,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   }
 
   /**
-   * Connect to reote peer
+   * Connect to remote peer
    */
   private connect(peer: string) {
     if(peer) {
@@ -337,7 +318,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       }
       // process remote description
       else {
-        console.log('message', message);
+        console.log('Got ' + message.desc.type + ': ', message);
         pc.setRemoteDescription(desc).catch(this.logError);
       }
     }
@@ -377,10 +358,11 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       //console.log('TeocliRTC::createConnection onicecandidate', evt);
       this.sendRTC(peer, { candidate: evt.candidate });
     };
-
+    
     // let the "negotiationneeded" event trigger offer generation
     pc.onnegotiationneeded = () => {
-      console.log('createConnection::onnegotiationneeded createOffer');
+      //if(pc.localDescription.type != 'answer') {
+      console.log('createConnection::onnegotiationneeded createOffer', pc);
       pc.createOffer()
         .then((offer: any) => {
           return pc.setLocalDescription(offer);
@@ -388,9 +370,12 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         .then(() => {
           // send the offer to the other peer
           //console.log('TeocliRTC::createConnection onnegotiationneeded', pc.localDescription);
+          // \TODO Send last during 0.5 sec
+          // let currentTimeInMs = new Date();
           this.sendRTC(peer, { desc: pc.localDescription });
         })
         .catch(this.logError);
+      //}  
     };
 
     // when remote peer connect his media'messa
@@ -442,12 +427,31 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     return pc;
   }
+    
+  /**
+   * Add stream to RTCConnection
+   */
+  protected addStream (pc: any, stream: any, options?: any) {
+
+    if (!options) {
+      stream.getTracks().forEach(
+        function(track: any) {
+          pc.addTrack(track, stream);
+        }
+      );
+    }
+    else {
+      if (options.video) pc.addTrack(stream.getVideoTracks()[0], stream);
+      if (options.audio) pc.addTrack(stream.getAudioTracks()[0], stream);
+    }
+    console.log('Added local stream to pc');
+  }
 
   /**
    * Show error
    */
   private logError(error: any) {
-    console.log('TeocliRTC::logError', error.name + ": " + error.message);
+    console.log('TeocliRTC::logError', error.name + ": " + error.message + ', (error: ', error, ')');
   }
   
   /**
@@ -480,6 +484,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         this.addStream(pc, localStream, options);
         pc.onremovestream = () => {
           if (this.callAnswer) this.callAnswer(peer);
+          console.log('onremovestream', peer);
           this.removeTracks(peer);
         }
       }
@@ -509,14 +514,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   }
   
   /**
-   * Remove all tracks from connection
+   * Remove all media tracks from connection
    */
   removeTracks(peer: string) {
     var pc = this.getConnection(peer);
     if (pc) {
-      [/*pc.getReceivers(), */pc.getSenders()].forEach((tracks:any) => {
-        tracks.forEach((track: any) => {
-          pc.removeTrack(track);
+      [/*pc.getReceivers(), */pc.getSenders()].forEach((senderss:any) => {
+        senderss.forEach((sender: any) => {
+          pc.removeTrack(sender);
         });
       });
     }

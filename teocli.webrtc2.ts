@@ -28,7 +28,7 @@
  * Version 0.0.2
  *
  */
-
+import {TeonetClientsTranslate, TeonetUserInfo, TeonetClientInfo} from './teocli.clients';
 import Teocli from 'teocli/teocli';
 import 'webrtc-adapter';
 
@@ -37,13 +37,35 @@ import 'webrtc-adapter';
 export class TeocliRTCMap {
 
   private map = <any>{};
+  private cli = new TeonetClientsTranslate(this.t);
+  
+  constructor(private t: any) {
+    
+  }
 
   /**
    * Create new key in map
    */
   create(key: string, pc: any, channel: any = undefined, data: any = {}) {
-    if (key)
-     this.map[key] = { pc: pc, channel: channel, data: data };
+    if (key) {
+      
+      this.map[key] = { pc: pc, channel: channel, data: data, translate: '', type: '' };
+      let split_key = this.cli.splitName(key);
+      if (split_key.user) {
+        this.cli.getUserInfo(split_key.user,
+          (err: any, user: TeonetUserInfo) => {
+            if (!err) this.map[key].translate = user.username;
+          }
+        );
+      }
+      if (split_key.client) {
+        this.cli.getClientInfo(split_key.client,
+          (err: any, client: TeonetClientInfo) => {
+            if (!err) this.map[key].type = client.data.type;
+          }
+        );
+      }
+    }
   }
 
   /**
@@ -53,7 +75,8 @@ export class TeocliRTCMap {
     if (key && this.map[key] && this.map[key].pc && channel) {
       let pc = this.map[key].pc;
       console.log('!!! pc:', pc, 'cannel: ', channel);
-      this.map[key] = { pc: pc, channel: channel, data: data };
+      this.map[key].channel = channel;
+      this.map[key].data = data;
     }
   }
 
@@ -131,7 +154,7 @@ export type CallOptionsType = { video: boolean, audio: boolean, chat: boolean };
 export class TeocliRTCSignalingChannel extends Teocli {
 
   protected client_name: string;
-  private map = new TeocliRTCMap();
+  private map = new TeocliRTCMap(this);
 
   protected oncandidate  = <(peer: string) => void> {};
   protected onrtcmessage = <(peer: string, evt: any) => void> {};

@@ -452,11 +452,11 @@ export class TeonetClientsTranslate implements OnDestroy {
 
   // Register to TeonetCli onother event
   constructor(private t: TeonetCli) {
-
+    //
   }
 
   ngOnDestroy() {
-    //for (let f of this.f) this.t.unsubscribe(f);
+    //
   }
 
   private setTimeout(f: any, done: any) {
@@ -484,7 +484,7 @@ export class TeonetClientsTranslate implements OnDestroy {
           if (id == user.userId) _done(user);
         }
         // Process client_info # 135
-        if (type && d.cmd == 135) {
+        else if (type && d.cmd == 135) {
           let client: TeonetClientInfo = d.data;
           if (id == client.clientId) _done(client);
         }

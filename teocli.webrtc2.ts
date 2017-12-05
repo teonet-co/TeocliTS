@@ -223,7 +223,7 @@ export class TeocliRTCSignalingChannel extends Teocli {
       console.log('TeocliRTCSignalingChannel::sendEvent ', 'teonet-close', obj);
       this.map.deleteAll();
     }
-  }  
+  }
 
   /**
    * Convert WebRTCNap to Array
@@ -240,14 +240,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   // RTC configurations (ICE Servers)
   private configuration = {
     iceServers: [
-      { urls: 'stun:stun.l.google.com:19302'},
-      { urls: 'turn:turn.bistri.com:80', username: 'homeo', credential: 'homeo' }
+      {urls: 'stun:stun.l.google.com:19302'},
+      {urls: 'turn:turn.bistri.com:80', username: 'homeo', credential: 'homeo'}
     ]
   };
-  
-  // Cakback registered by VideoCall Page called when remote peer connect it's 
+
+  // Cakback registered by VideoCall Page called when remote peer connect it's
   // tracks: When remote peer make call to this local peer
-  private callAnswer:  any; 
+  private callAnswer:  any;
 
   /**
    * TeocliRTC class constructor
@@ -271,7 +271,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     }
     else this.logError({ name: 'TeocliRTC::connect', message: 'Empty peer name' });
   }
-  
+
   /**
    * Process remote peer RTC signal messages
    */
@@ -339,7 +339,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     }
   }
 
-    /**
+  /**
    * Create connection between this peer and remote peer
    *
    * @param {string} peer Remote peer name
@@ -347,9 +347,13 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   private createConnection(peer: string, isInitiator: boolean = true) {
 
     var channel: any;
+    var lastTime = 0;
+    var t: number = 0;
+    const WAIT_NEXT_NEGOTIATION = 50;
     var pc: any = new RTCPeerConnection(this.configuration);
 
     console.log('TeocliRTC::createConnection to:', peer, 'initiator:', isInitiator);
+    
     this.startConnection(peer, pc);  // Add RTCPeerConnection to RTC map
     this.sendRTC(peer, { desc: { type: 'teocli-start' } }); // Send start commad to receiver
 
@@ -358,27 +362,35 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       //console.log('TeocliRTC::createConnection onicecandidate', evt);
       this.sendRTC(peer, { candidate: evt.candidate });
     };
-    
+
     // let the "negotiationneeded" event trigger offer generation
     pc.onnegotiationneeded = () => {
-      //if(pc.localDescription.type != 'answer') {
-      console.log('createConnection::onnegotiationneeded createOffer', pc);
-      pc.createOffer()
-        .then((offer: any) => {
-          return pc.setLocalDescription(offer);
-        })
-        .then(() => {
-          // send the offer to the other peer
-          //console.log('TeocliRTC::createConnection onnegotiationneeded', pc.localDescription);
-          // \TODO Send last during 0.5 sec
-          // let currentTimeInMs = new Date();
-          this.sendRTC(peer, { desc: pc.localDescription });
-        })
-        .catch(this.logError);
-      //}  
+      console.log('createConnection::onnegotiationneeded', pc);
+
+      // Generate and Send only last offer during 50 ms
+      // The onnegotiationneeded fire every time when we add or delete streams 
+      // tracks. And we will wait all tracks added or deleted and than send one 
+      // offer to remote
+      let currentTime = new Date().getTime();
+      let createOffer = () => {
+        console.log('createConnection::onnegotiationneeded createOffer', pc);
+        pc.createOffer()
+          .then((offer: any) => {
+            return pc.setLocalDescription(offer);
+          })
+          .then(() => {
+            // Send the offer to the other peer
+            this.sendRTC(peer, { desc: pc.localDescription });
+          })
+          .catch(this.logError);
+      };
+
+      if (t && currentTime - lastTime < WAIT_NEXT_NEGOTIATION) clearTimeout(t);
+      t = setTimeout(createOffer, WAIT_NEXT_NEGOTIATION);
+      lastTime = currentTime;
     };
 
-    // when remote peer connect his media'messa
+    // When remote peer connect his media
     pc.ontrack = (e: any) => {
       console.log('pc.ontrack', e);
       // Connect remote stream to the remoteVideo control
@@ -389,9 +401,8 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     var processChannel = (channel: any) => {
       // When channe lopen
       channel.onopen = () => {
-        // e.g. enable send button
-        //enableChat(this.channel);
-        console.log('TeocliRTC::createConnection processChannel channel.onopen Connected to:', peer);
+        console.log('TeocliRTC::createConnection processChannel channel.onopen',
+                    'Connected to:', peer);
         this.setConnected(peer, channel);
       };
       channel.onmessage = (event: any) => {
@@ -412,7 +423,9 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     // Create chanel if this peer is initiator
     if(isInitiator) {
-      channel = pc.createDataChannel('teocli-rtc', { maxRetransmitTime: 3000 });  // in milliseconds); // peer
+      channel = pc.createDataChannel('teocli-rtc', { 
+        maxRetransmitTime: 3000   // milliseconds
+      });  
       //console.log('TeocliRTC::createConnection (createDataChannel) to', peer, channel);
       processChannel(channel);
     }
@@ -427,12 +440,18 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     return pc;
   }
-    
+
   /**
    * Add stream to RTCConnection
+   * 
+   * @param {any} Reference to RTCPeerConnection
+   * @param {any} Stream to add to connection
+   * @param {any} Options with tracks type (video or audio) to add. If options 
+   *              is ommited than all strean tracks will be added
    */
   protected addStream (pc: any, stream: any, options?: any) {
-
+    
+    // Add tracks selected in options
     if (!options) {
       stream.getTracks().forEach(
         function(track: any) {
@@ -440,33 +459,38 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         }
       );
     }
+    // Add all tracks
     else {
       if (options.video) pc.addTrack(stream.getVideoTracks()[0], stream);
       if (options.audio) pc.addTrack(stream.getAudioTracks()[0], stream);
     }
-    console.log('Added local stream to pc');
+    console.log('Stream added to pc');
   }
 
   /**
    * Show error
+   * 
+   * @param {name: string, nessage: string} error Error to show in console
    */
   private logError(error: any) {
-    console.log('TeocliRTC::logError', error.name + ": " + error.message + ', (error: ', error, ')');
+    console.log('TeocliRTC::logError', error.name + ": " + error.message + 
+      ', (error: ', error, ')');
   }
-  
+
   /**
    * Make Call to remote peer
    *
    * @param {string} peer Peer name
-   * @param {CallOptionsType} options Options: 
-   *                            video - reqiest video, 
-   *                            audio - request audio, 
+   * @param {CallOptionsType} options Options:
+   *                            video - reqiest video,
+   *                            audio - request audio,
    *                            chat - request chat channel
-   * 
+   *
    * @return {boolean} true if call send to remotepeer;
    *                   false if peer name empty,
-   *                   or peer not connected to this host,
-   *                   or if wrong options send (all: video, audio and channel is false)
+   *                         or peer not connected to this host,
+   *                         or wrong options send (all: video, audio and 
+   *                            channel is false)
    */
   call (peer: string,
        localStream?: any,
@@ -497,13 +521,12 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     return false;
   }
-  
+
   /**
    * Hangup call
    */
   hangup(peer: string) {
-    //this.removeConnection(peer);
-    this.removeTracks(peer);    
+    this.removeTracks(peer);
   }
 
   /**
@@ -512,14 +535,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   registerCallAnswer(callAnswer: any) {
     this.callAnswer = callAnswer;
   }
-  
+
   /**
-   * Remove all media tracks from connection
+   * Remove all senders (all senders media tracks) from connection
    */
   removeTracks(peer: string) {
     var pc = this.getConnection(peer);
     if (pc) {
-      [/*pc.getReceivers(), */pc.getSenders()].forEach((senderss:any) => {
+      [/*pc.getReceivers(), */pc.getSenders()].forEach((senderss: any) => {
         senderss.forEach((sender: any) => {
           pc.removeTrack(sender);
         });
@@ -528,10 +551,9 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   }
 
   /**
-   * UnRegister remote call answer
+   * Unregister remote call answer
    */
   unRegisterCallAnswer() {
     this.callAnswer = undefined;
   }
-
 }

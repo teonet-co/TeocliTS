@@ -75,43 +75,36 @@ export class TeonetClientsRequest {
 
 @Component({
   selector: 'teonet-clients',
-  //    template: "\n\
-  //        <div>n = {{ n }}</div>\n\
-  //        <div *ngFor='let client of clients; index as i; first as isFirst'>\n\
-  //          {{i+1}}/{{clients.length}}. \n\
-  //          {{ (client.translate ? client.translate : client.name) }} \n\
-  //          {{ (client.type ? '(' + client.type + ')' : '') }} \n\
-  //          {{ (client.time ? ' -- ' + client.time + ' ms' : '') }}\n\
-  //        </div>"
-  //
-  //  No: {{i+1}}/{{clients.length}}
   styles: ['\n\
-    .teonet-clients-body {\n\
-        /*font-size: 85%;*/\n\
-    }\n\
-    .header {\n\
-      border: solid 1px #eee;\n\
-      font-size: 115%;\n\
-      padding: 2px 0;\n\
-    }\n\
+  .border-right {\n\
+    border-right: solid 1px #eee;\n\
+  }\n\
+  .header {\n\
+    border: solid 1px #eee;\n\
+  }\n\
   '],
   template: '\n\
-    <div class="row header item item-divider toolbar-background-md">\n\
-      <div class="col col-10" col-1>№</div>\n\
-      <div class="col">User name</div>\n\
-      <div class="col">Client type</div>\n\
-      <div class="col col-20 text-right" col-2 text-right>Ping</div>\n\
+    <div class="row item-divider item header toolbar-background-md">\n\
+      <div class="col border-right" col-1>№</div>\n\
+      <div class="col border-right">User name</div>\n\
+      <div class="col border-right">Client type</div>\n\
+      <div class="col" col-2 text-right>Ping</div>\n\
     </div>\n\
     \n\
-    <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" *ngFor="let client of clients; index as i; first as isFirst">\n\
-      <div class="col col-10" col-1>{{i+1}}</div>\n\
-      <div class="col"><a href="">{{(client.translate ? client.translate : client.name) | slice:0:15}}</a></div>\n\
-      <div class="col">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
-      <div class="col col-20 text-right" col-2 text-right>{{(client.time ? client.time : "")}}</div>\n\
-    </div>\n'
-  //        <div class="text-center padding" ng-hide="clients.length">\n\
-  //            <ion-spinner icon="lines"></ion-spinner>\n\
-  //        </div>\n'
+    <div class="content">\n\
+      <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" \n\
+        *ngFor="let client of clients; index as i; first as isFirst">\n\
+        <div class="col border-right" col-1>{{i+1}}</div>\n\
+        <div class="col border-right"><a href="#">{{(client.translate ? client.translate : client.name) | slice:0:15}}</a></div>\n\
+        <div class="col border-right">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
+        <div class="col" col-2 text-right>{{(client.time ? client.time : "")}}</div>\n\
+      </div>\n\
+    </div>\n\
+    \n'
+//    <div class="row text-center padding" [hidden]="clients.length">\n\
+//      <ion-col col-1><ion-spinner icon="lines"></ion-spinner></ion-col>\n\
+//      <ion-col class="padding">Clients loading...</ion-col>\n\
+//    </div>\n\
 })
 
 /**

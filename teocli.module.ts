@@ -24,7 +24,7 @@
 
 import { Injectable } from '@angular/core';
 import { TeonetAuth } from './teocli.auth';
-import { TeocliRTC } from './teocli.webrtc2';
+import { TeocliRTC } from './teocli.webrtc';
 
 export interface TeonetEventType {
   TEONET_INIT: string,

@@ -108,7 +108,7 @@ export class TeonetClientsRequest {
 })
 
 /**
- * List of clients class
+ * Clients class
  */
 export class TeonetClients implements OnDestroy {
 

@@ -27,7 +27,7 @@ import {Component, OnDestroy} from '@angular/core';
 import {TeonetCli, Teonet, onotherData, onechoData} from './teocli.module';
 import {IntervalObservable} from 'rxjs/observable/IntervalObservable';
 
-export type onclientDisplArEl = {name: string, translate: string, type: string, time: number};
+export type onclientDisplArEl = {name: string, translate: string, email: string, type: string, time: number};
 export type onclientDisplAr = Array<onclientDisplArEl>;
 type onclientsDataAr = Array<{name: string}>;
 type onclientsData = {
@@ -167,6 +167,7 @@ export class TeonetClients implements OnDestroy {
           let el: onclientDisplArEl = {
             name: client.name,
             translate: '',
+            email: '',
             type: '',
             time: 0
           };
@@ -198,6 +199,7 @@ export class TeonetClients implements OnDestroy {
                         // Exists
                         function (currentElement: onclientDisplArEl) {
                           currentElement.translate = user.username;
+                          currentElement.email = user.email;
                         }
                       );
                     }

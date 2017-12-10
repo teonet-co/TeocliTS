@@ -153,9 +153,9 @@ export type CallOptionsType = { video: boolean, audio: boolean, chat: boolean };
 
 export class TeocliRTCSignalingChannel extends Teocli {
 
-  protected client_name: string;
   private map = new TeocliRTCMap(this);
-
+  
+  protected client_name: string;  
   protected oncandidate  = <(peer: string) => void> {};
   protected onrtcmessage = <(peer: string, evt: any) => void> {};
 
@@ -305,10 +305,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     // Get connection or create new
     var pc: any;
-    pc = this.getConnection(peer) || this.createConnection(peer, false);
-    //if(!pc) pc = this.createConnection(peer, false);
-
     var message = evt.data;
+    
+    // If peer request connection remove existing connection first    
+    //if(message.desc && message.desc.type == 'teocli-start') this.removeConnection(peer); 
+    
+    // Get existing connection or create new one
+    pc = this.getConnection(peer) || this.createConnection(peer, false);
+
     if (message.desc) {
       var desc = message.desc;
 
@@ -347,14 +351,8 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       }
     }
     else if (message.start) {
+      // \TODO This message not used... Just remove it 
       console.log('Got start message', message);
-//      started = true;
-//      if (audio && audioSendTrack) {
-//        audio.sender.replaceTrack(audioSendTrack);
-//      }
-//      if (video && videoSendTrack) {
-//        video.sender.replaceTrack(videoSendTrack);
-//      }
     }
     // process ice candidate
     else {
@@ -386,6 +384,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       //console.log('TeocliRTC::createConnection onicecandidate', evt);
       this.sendRTC(peer, { candidate: evt.candidate });
     };
+    
+    // when remote peer disocnnected
+    pc.oniceconnectionstatechange = () => {
+      if(pc.iceConnectionState == 'disconnected') {
+          console.log('!!! Disconnected');
+          this.removeConnection(peer);
+      }
+    }
 
     // let the "negotiationneeded" event trigger offer generation
     pc.onnegotiationneeded = () => {

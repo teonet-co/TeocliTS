@@ -415,8 +415,9 @@ import {TeonetClientsNum} from './teocli.clients';
   styles: ['\n\
     .teonet-status { \n\
         opacity: 0.85;\n\
-        position: absolute;\n\
-        right: 10px;\n\
+        position: relative;\n\
+        float: right;\n\
+        right: 20px;\n\
         top: 10px;\n\
         /*font-size: 60%;*/\n\
     }\n\
@@ -479,19 +480,19 @@ import {TeonetClientsNum} from './teocli.clients';
  */
 export class TeonetStatus implements AfterContentInit {
 
-  peer: string = '';           //! Peer name Component input
-  label: string = 'Teo is';    //! Label of state Component input
-  reconnect: string = 'true';  //! Reconnect when peer don't answer
-  show_peer: string = 'false'; //! Show peer name Component input
+  peer: string = '';              //! Peer name Component input
+  label: string = 'Teo is';       //! Label of state Component input
+  reconnect: string = 'true';     //! Reconnect when peer don't answer
+  show_peer: string = 'false';    //! Show peer name Component input
 
-  tcli: TeonetClientsNum;      //! TeonetClientsNum object
+  tcli: TeonetClientsNum;         //! TeonetClientsNum object
   time: number = (this.t.status == Teonet.status.online) ? 0 : -1; //! Peer answer time in ms
 
-  private last_answere = 0.00; //! Last peer answer time
+  private last_answere = 0.00;    //! Last peer answer time
 
-  private SEND_ECHO_AFTER = 1.00;
-  private SET_LOGOFF_AFTER = 2.00;
-  private RECONNECT_AFTER = 15.00;
+  private SEND_ECHO_AFTER = 1.00; //! Send echo after timeout
+  private SET_LOGOFF_AFTER = 3.00;//! Set status logoff after timeout  
+  private RECONNECT_AFTER = 8.00; //! Reconnect after timeout
 
   /**
    * Constructor connect to Teonet and load TeonetClientsNum class

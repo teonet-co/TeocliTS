@@ -153,7 +153,7 @@ export type CallOptionsType = { video: boolean, audio: boolean, chat: boolean };
 
 export class TeocliRTCSignalingChannel extends Teocli {
 
-  private map = new TeocliRTCMap(this);
+  protected map = new TeocliRTCMap(this);
   
   protected client_name: string;  
   protected oncandidate  = <(peer: string) => void> {};
@@ -331,6 +331,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       // if we get an offer, we need to reply with an answer
       else if (desc.type == 'offer') {
         console.log('Got offer', message);
+        this.nodisconnect_flg = false;
         pc.setRemoteDescription(desc)
           .then(() => {
             return pc.createAnswer();
@@ -360,6 +361,8 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       pc.addIceCandidate(message.candidate).catch(this.logError);
     }
   }
+  
+  private nodisconnect_flg: boolean = false;
 
   /**
    * Create connection between this peer and remote peer
@@ -386,11 +389,28 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     };
     
     // when remote peer disocnnected
-    pc.oniceconnectionstatechange = () => {
+    pc.oniceconnectionstatechange = (event) => {
+      console.log('oniceconnectionstatechange:', pc.iceConnectionState, ' event:', event);
       if(pc.iceConnectionState == 'disconnected') {
-          console.log('!!! Disconnected');
-          this.removeConnection(peer);
+          //\TODO Close data channel
+          // This event happends when remote data channel is disconnected 
+          // (We processed this even and close local channel).
+          // 
+          // Or it happends when remote media track added to this RTC connection, 
+          // to stop this event we used nodisconnect_flg: boolean which we set 
+          // to true when pc.ontrack event hapends.
+          let ch: any;
+          if(!this.nodisconnect_flg && (ch = this.map.getChannel(peer))) {
+            console.log('oniceconnectionstatechange !!! Disconnected - close channel');
+            ch.close();
+            //this.removeConnection(peer);
+          }
       }
+      if(pc.iceConnectionState == 'failed') {
+          console.log('oniceconnectionstatechange !!! failed');
+          this.removeConnection(peer); // Close WebRTC connection
+      }
+      this.nodisconnect_flg = false;
     }
 
     // let the "negotiationneeded" event trigger offer generation
@@ -404,6 +424,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       let currentTime = new Date().getTime();
       let createOffer = () => {
         console.log('createConnection::onnegotiationneeded createOffer', pc);
+        this.nodisconnect_flg = true; // Set no disconnect flag
         pc.createOffer()
           .then((offer: any) => {
             return pc.setLocalDescription(offer);
@@ -423,6 +444,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     // When remote peer connect his media
     pc.ontrack = (e: any) => {
       console.log('pc.ontrack', e);
+      this.nodisconnect_flg = true; // Set no disconnect flag 
       // Connect remote stream to the remoteVideo control
       if (this.callAnswer) this.callAnswer(peer, e.streams[0]);
     }
@@ -443,7 +465,9 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       channel.onclose = () => {
         console.log('TeocliRTC::createConnection:onclose', peer);
         this.removeConnection(peer);
+        //this.map.deleteChannel(peer);
         if (this.callAnswer) this.callAnswer(peer);
+        this.nodisconnect_flg = false;
       }
       // When channel error
       channel.onerror = () => {

@@ -38,9 +38,9 @@ export class TeocliRTCMap {
 
   private map = <any>{};
   private cli = new TeonetClientsTranslate(this.t);
-  
+
   constructor(private t: any) {
-    
+
   }
 
   /**
@@ -48,20 +48,20 @@ export class TeocliRTCMap {
    */
   create(key: string, pc: any, channel: any = undefined, data: any = {}) {
     if (key) {
-      
+
       this.map[key] = { pc: pc, channel: channel, data: data, translate: '', type: '' };
       let split_key = this.cli.splitName(key);
       if (split_key.user) {
         this.cli.getUserInfo(split_key.user,
           (err: any, user: TeonetUserInfo) => {
-            if (!err) this.map[key].translate = user.username;
+            if (!err && this.map[key]) this.map[key].translate = user.username;
           }
         );
       }
       if (split_key.client) {
         this.cli.getClientInfo(split_key.client,
           (err: any, client: TeonetClientInfo) => {
-            if (!err) this.map[key].type = client.data.type;
+            if (!err && this.map[key]) this.map[key].type = client.data.type;
           }
         );
       }
@@ -153,9 +153,8 @@ export type CallOptionsType = { video: boolean, audio: boolean, chat: boolean };
 
 export class TeocliRTCSignalingChannel extends Teocli {
 
+  protected client_name: string;
   protected map = new TeocliRTCMap(this);
-  
-  protected client_name: string;  
   protected oncandidate  = <(peer: string) => void> {};
   protected onrtcmessage = <(peer: string, evt: any) => void> {};
 
@@ -163,7 +162,7 @@ export class TeocliRTCSignalingChannel extends Teocli {
    * Start peer connection - Create new key in the RTC map
    */
   protected startConnection(peer: string, pc: any) {
-    //console.log('TeocliRTCSignalingChannel:startConnection', peer, pc);
+    console.log('TeocliRTCSignalingChannel:startConnection', peer, pc);
     this.map.create(peer, pc);
   }
 
@@ -273,6 +272,9 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
   // tracks: When remote peer make call to this local peer
   private callAnswer:  any;
 
+  // No dissconect flag when iceConnectionState equal to 'disconnected'
+  private nodisconnect_flg: boolean = false;
+
   /**
    * TeocliRTC class constructor
    */
@@ -289,11 +291,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
    * Connect to remote peer
    */
   private connect(peer: string) {
-    if(peer) {
-      //console.log('TeocliRTC::connect to', peer);
-      this.createConnection(peer);
-    }
-    else this.logError({ name: 'TeocliRTC::connect', message: 'Empty peer name' });
+    if(peer) this.createConnection(peer);
   }
 
   /**
@@ -301,32 +299,58 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
    */
   private processRemoteMessage(peer: string, evt: any) {
 
-    //console.log('TeocliRTC::constructor::onremotemessage from:', peer, 'env:', evt);
-
     // Get connection or create new
     var pc: any;
     var message = evt.data;
     
-    // If peer request connection remove existing connection first    
-    //if(message.desc && message.desc.type == 'teocli-start') this.removeConnection(peer); 
-    
-    // Get existing connection or create new one
-    pc = this.getConnection(peer) || this.createConnection(peer, false);
+    // Send reset to remote peer and close current connection
+    var send_reset = () => {
+      this.sendRTC(peer, { desc: { type: 'teocli-reset' } }); // Send reset commad to receiver
+      let ch = this.map.getChannel(peer);
+      if(ch) {
+        console.log('send_reset and !!! Disconnected');
+        ch.close();
+      }
+      else this.removeConnection(peer);
+    }
+        
+    // Reset if teocli-reset send or if teocli-start send and connection already exists
+    if(message.desc && message.desc.type == 'teocli-reset' || 
+       message.desc && message.desc.type == 'teocli-start' && this.getConnection(peer)) {
+       
+      console.log('Got RTC \'' + message.desc.type + '\' signal from peer: ' + peer + ', remove existing connection');
+      //this.removeConnection(peer);
+      //this.map[peer].close();
+      //delete this.map[peer]; // Delete key (drop connection)
+      //pc = this.getConnection(peer);
+      //this.map.getChannel(peer).close();
+      //delete this.map.getMap()[peer];
+    }
 
+    // Get existing connection or create new one
+    pc = this.getConnection(peer); // || this.createConnection(peer, false);
+
+    // Process messages
     if (message.desc) {
       var desc = message.desc;
-
-      // teocli message to quick create this connection
-      if (desc.type == 'teocli-start') {
-        // Do something ...
+      // teocli message to create connection
+      if (desc.type == 'teocli-start' || desc.type == 'teocli-reset') {
+        // Create connection
+        console.log('Got RTC ' + desc.type + ' signal from:', peer);
+        this.createConnection(peer, false);
+      }
+      // Connection error
+      else if(!pc) {
+        console.error('pc not created yet', peer);
       }
       // teocli message to connect media streams
       else if (desc.type == 'teocli-call') {
-        // \TODO What do with audioSender and videoSender
+        // \TODO Used in WebCamera mode to add local stream to pc connection.
+        // What do with audioSender and videoSender
         console.log('Got RTC teocli-call signal from peer: ' + peer + ', signal:', message);
-//        if (this.localStream) {
-//          this.addStream(pc, this.localStream);
-//        }
+        //if (this.localStream) {
+        //  this.addStream(pc, this.localStream);
+        //}
       }
       // if we get an offer, we need to reply with an answer
       else if (desc.type == 'offer') {
@@ -343,7 +367,10 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
             //var str = JSON.stringify({ desc: pc.localDescription });
             this.sendRTC(peer, { desc: pc.localDescription });
           })
-          .catch(this.logError);
+          .catch((err: any) => {
+            send_reset();
+            this.logError(err);
+          });
       }
       // process remote description
       else {
@@ -351,18 +378,19 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         pc.setRemoteDescription(desc).catch(this.logError);
       }
     }
-    else if (message.start) {
-      // \TODO This message not used... Just remove it 
-      console.log('Got start message', message);
-    }
-    // process ice candidate
-    else {
+    // Process ice candidate
+    else if (pc) {
       console.log('Got ice candidate', message);
-      pc.addIceCandidate(message.candidate).catch(this.logError);
+      pc.addIceCandidate(message.candidate).catch((err: any) => {
+        send_reset();
+        this.logError(err);
+      });
+    }
+    // Connection error
+    else {
+      console.error('pc not created yet', peer);
     }
   }
-  
-  private nodisconnect_flg: boolean = false;
 
   /**
    * Create connection between this peer and remote peer
@@ -380,24 +408,27 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     console.log('TeocliRTC::createConnection to:', peer, 'initiator:', isInitiator);
     
     this.startConnection(peer, pc);  // Add RTCPeerConnection to RTC map
-    this.sendRTC(peer, { desc: { type: 'teocli-start' } }); // Send start commad to receiver
+    if(isInitiator) {
+      console.log('Send RTC teocli-start signal to:', peer, 'initiator', isInitiator);
+      this.sendRTC(peer, { desc: { type: 'teocli-start' } }); // Send start commad to receiver
+    }
 
     // send any ice candidates to the other peer
     pc.onicecandidate = (evt: any) => {
       //console.log('TeocliRTC::createConnection onicecandidate', evt);
       this.sendRTC(peer, { candidate: evt.candidate });
     };
-    
+
     // when remote peer disocnnected
-    pc.oniceconnectionstatechange = (event) => {
+    pc.oniceconnectionstatechange = (event: any) => {
       console.log('oniceconnectionstatechange:', pc.iceConnectionState, ' event:', event);
       if(pc.iceConnectionState == 'disconnected') {
           //\TODO Close data channel
-          // This event happends when remote data channel is disconnected 
+          // This event happends when remote data channel is disconnected
           // (We processed this even and close local channel).
-          // 
-          // Or it happends when remote media track added to this RTC connection, 
-          // to stop this event we used nodisconnect_flg: boolean which we set 
+          //
+          // Or it happends when remote media track added to this RTC connection,
+          // to stop this event we used nodisconnect_flg: boolean which we set
           // to true when pc.ontrack event hapends.
           let ch: any;
           if(!this.nodisconnect_flg && (ch = this.map.getChannel(peer))) {
@@ -418,8 +449,8 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
       console.log('createConnection::onnegotiationneeded', pc);
 
       // Generate and Send only last offer during 50 ms
-      // The onnegotiationneeded fire every time when we add or delete streams 
-      // tracks. And we will wait all tracks added or deleted and than send one 
+      // The onnegotiationneeded fire every time when we add or delete streams
+      // tracks. And we will wait all tracks added or deleted and than send one
       // offer to remote
       let currentTime = new Date().getTime();
       let createOffer = () => {
@@ -444,7 +475,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
     // When remote peer connect his media
     pc.ontrack = (e: any) => {
       console.log('pc.ontrack', e);
-      this.nodisconnect_flg = true; // Set no disconnect flag 
+      this.nodisconnect_flg = true; // Set no disconnect flag
       // Connect remote stream to the remoteVideo control
       if (this.callAnswer) this.callAnswer(peer, e.streams[0]);
     }
@@ -457,6 +488,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
                     'Connected to:', peer);
         this.setConnected(peer, channel);
       };
+      // When message received
       channel.onmessage = (event: any) => {
         //console.log('TeocliRTC::createConnection:onmesage', peer, event);
         this.process(event.data);
@@ -477,9 +509,9 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     // Create chanel if this peer is initiator
     if(isInitiator) {
-      channel = pc.createDataChannel('teocli-rtc', { 
+      channel = pc.createDataChannel('teocli-rtc', {
         maxRetransmitTime: 3000   // milliseconds
-      });  
+      });
       //console.log('TeocliRTC::createConnection (createDataChannel) to', peer, channel);
       processChannel(channel);
     }
@@ -497,14 +529,14 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
   /**
    * Add stream to RTCConnection
-   * 
+   *
    * @param {any} Reference to RTCPeerConnection
    * @param {any} Stream to add to connection
-   * @param {any} Options with tracks type (video or audio) to add. If options 
+   * @param {any} Options with tracks type (video or audio) to add. If options
    *              is ommited than all strean tracks will be added
    */
   protected addStream (pc: any, stream: any, options?: any) {
-    
+
     // Add tracks selected in options
     if (!options) {
       stream.getTracks().forEach(
@@ -523,12 +555,13 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
   /**
    * Show error
-   * 
+   *
    * @param {name: string, nessage: string} error Error to show in console
    */
   private logError(error: any) {
-    console.log('TeocliRTC::logError', error.name + ": " + error.message + 
+    console.error('TeocliRTC::logError', error.name + ": " + error.message +
       ', (error: ', error, ')');
+    //this.removeConnection(peer);
   }
 
   /**
@@ -543,7 +576,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
    * @return {boolean} true if call send to remotepeer;
    *                   false if peer name empty,
    *                         or peer not connected to this host,
-   *                         or wrong options send (all: video, audio and 
+   *                         or wrong options send (all: video, audio and
    *                            channel is false)
    */
   call (peer: string,
@@ -567,7 +600,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
         }
       }
 
-      // \TODO Create Chat channel
+      // \TODO Create Chat data channel
       if (options.chat) { }
 
       return true;

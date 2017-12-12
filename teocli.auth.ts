@@ -133,16 +133,18 @@ export class Base64 {
  */
 export class TeonetStorage {
   
-  constructor(private key: string) {}
+  constructor(private key: string, private binary: boolean = false) {}
   
   get() {
-    let storage = JSON.parse( <string>localStorage.getItem(this.key));
-    if(!storage) storage = {};
-    return storage;
+    return (this.binary ? 
+              localStorage.getItem(this.key)  :
+              JSON.parse( <string>localStorage.getItem(this.key))
+           ) || {};
   }
   
   set(value: any) {
-    localStorage.setItem(this.key, JSON.stringify(value));
+    if(!this.binary) localStorage.setItem(this.key, JSON.stringify(value));
+    else localStorage.setItem(this.key, value);
   }
   
   /**

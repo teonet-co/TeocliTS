@@ -117,6 +117,7 @@ export class TeonetClients implements OnDestroy {
   clients: onclientDisplAr = [];
 
   private f: Array<any> = [];
+  private onclients: any;
   private cli = new TeonetClientsTranslate(this.t);
 
   private interval = IntervalObservable.create(1000).subscribe(() => { //.subscribe(n => this.n = n);
@@ -250,6 +251,8 @@ export class TeonetClients implements OnDestroy {
           });
         }
       }
+      
+      if (this.onclients) this.onclients();
 
       return 0;
     }));
@@ -283,6 +286,10 @@ export class TeonetClients implements OnDestroy {
     //console.debug('TeonetClients::ngOnDestroy');
     for (let f of this.f) this.t.unsubscribe(f);
     this.interval.unsubscribe();
+  }
+  
+  setOnclients(onclients: any) {
+    this.onclients = onclients;
   }
 
   private isComponentActive(): boolean {

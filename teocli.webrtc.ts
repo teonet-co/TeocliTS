@@ -91,7 +91,7 @@ export class TeocliRTCMap {
    * Check if key exist and connection with this peer established
    */
   connected(key: string) {
-    return this.getChannel(key);
+    return this.getChannel(key) ? true : false;
   }
 
   /**
@@ -201,6 +201,13 @@ export class TeocliRTCSignalingChannel extends Teocli {
    */
   getWebRTCMap() {
     return this.map.getMap();
+  }
+  
+  /**
+   * Is peer connected and is online
+   */
+  isWebRTConline(key: string) {
+    return this.map.connected(key);
   }
 
   /**

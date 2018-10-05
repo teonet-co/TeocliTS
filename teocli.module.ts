@@ -240,6 +240,13 @@ export class TeonetCli extends TeocliRTC {
       this.sendEvent('onclients', data);
       return 1;
     }
+    
+    // Send 'onpeers' to subscribers
+    this.onpeers = (err, data: object) => {
+      console.debug("TeonetCli::onpeers", err, data);
+      this.sendEvent('onpeers', data);
+      return 1;
+    }
   }
 
   /**

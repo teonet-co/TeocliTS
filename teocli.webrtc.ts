@@ -408,7 +408,7 @@ export class TeocliRTC extends TeocliRTCSignalingChannel {
 
     var channel: any;
     var lastTime = 0;
-    var t: number = 0;
+    var t: any = 0;
     const WAIT_NEXT_NEGOTIATION = 50;
     var pc: any = new RTCPeerConnection(this.configuration);
 

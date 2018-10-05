@@ -1,5 +1,6 @@
 /npm-debug.log
 /nbproject/private/
+/node_modules/
 /dist/
 /teocli/teocli.ngsummary.json
 /index.ngsummary.json

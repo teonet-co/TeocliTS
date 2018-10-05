@@ -87,7 +87,6 @@ export class TeonetPeersRequest {
     <div class="row item-divider item header toolbar-background-md">\n\
       <div class="col border-right" col-1>№</div>\n\
       <div class="col border-right">Name</div>\n\
-      <div class="col border-right">Type</div>\n\
       <div class="col border-right">Version</div>\n\
       <div class="col" text-right>Ping</div>\n\
     </div>\n\
@@ -96,10 +95,9 @@ export class TeonetPeersRequest {
       <div class="teonet-clients-body row item {{ (i%2 ? \'toolbar-background-md\' : \'\') }}" \n\
         *ngFor="let client of clients; index as i; first as isFirst">\n\
         <div class="col border-right" col-1>{{i+1}}</div>\n\
-        <div class="col border-right"><a href="#">{{client.name | slice:0:15}}</a></div>\n\
-        <div class="col border-right">{{(client.type ? client.type : "") | slice:0:15}}</div>\n\
+        <div class="col border-right"><a href="#">{{client.name | slice:0:20}}</a></div>\n\
         <div class="col border-right">0.0.1</div>\n\
-        <div class="col" col-2 text-right>{{client.triptime}}</div>\n\
+        <div class="col" text-right>{{client.triptime}}</div>\n\
       </div>\n\
     </div>\n\
     \n'

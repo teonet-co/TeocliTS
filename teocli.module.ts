@@ -73,7 +73,7 @@ export class TeonetCli extends TeocliRTC {
   private eventSubscribers: Array<eventSubscribersFunc>;
   private login_page: any;
   private signup_page: any;
-  private restore_page: any;  
+  private restore_page: any;
   static EVENT: TeonetEventType = {
     TEONET_INIT: 'teonet-init',
     TEONET_CLOSE: 'teonet-close',
@@ -87,7 +87,7 @@ export class TeonetCli extends TeocliRTC {
     var ws = new WebSocket(connect_url);
     super(ws);
     this.status = Teonet.status.connecting
-    this.isTeonetClientsActiveFunc = () => {return true;};
+    this.isTeonetClientsActiveFunc = () => { return true; };
     this.connect_url = connect_url;
     this.RECONNECT_TIMEOUT = 1000;
     this.INIT_TIMEOUT = 7000;
@@ -119,10 +119,10 @@ export class TeonetCli extends TeocliRTC {
           this.setClientName('teo-cli-ts-ws-' + Math.floor((Math.random() * 100) + 1));
         }
       }
-      
+
       // Send login command to teonet L0 server
       this.login(this.client_name);
-      
+
       // Set reconnect timeout (reconnect if does not login during timeout
       setTimeout(() => {
         if (!this.isInit()) {
@@ -158,7 +158,7 @@ export class TeonetCli extends TeocliRTC {
     };
 
     // When get websocket error
-    this.onerror = function (ev) {};
+    this.onerror = function(ev) { };
 
     // When get 'onother' message fom webspcket. Check cmd 96 - teo-auth answer
     // Send 'teonet-init' to subscribers
@@ -168,7 +168,7 @@ export class TeonetCli extends TeocliRTC {
       console.debug("TeonetCli::onother", err, data);
 
       var processed = 0;
-      var d = <onotherData> data;
+      var d = <onotherData>data;
 
       // Check login answer
       if (d && d.cmd === 96) {
@@ -185,7 +185,7 @@ export class TeonetCli extends TeocliRTC {
           this.sendEvent(TeonetCli.EVENT.TEONET_INIT);
           this.status = Teonet.status.online;
           this.inited = true;
-          if(loggedin) this.sendEvent(TeonetCli.EVENT.TEONET_LOGGEDIN);
+          if (loggedin) this.sendEvent(TeonetCli.EVENT.TEONET_LOGGEDIN);
           //$rootScope.networksItems = data.data.networks;
         };
 
@@ -193,12 +193,12 @@ export class TeonetCli extends TeocliRTC {
         if (this.getClientName() == user.userId + ':' + user.clientId) {
           sendEventInit(true);
         }
-        
+
         else {
           // Login with saved email and password if remember_me is set
           if (user.remember_me) {
             //authserver.refresh(); // refresh auth token
-            authserver.login(user.email, authserver.base64.decode(user.password), 
+            authserver.login(user.email, authserver.base64.decode(user.password),
               (err: any, response: any) => {
                 if (err) {
                   // Goto Login screen
@@ -214,7 +214,7 @@ export class TeonetCli extends TeocliRTC {
             );
           }
           // Goto Login page
-          else {            
+          else {
             sendEventInit();
             this.loginPage();
           }
@@ -240,7 +240,7 @@ export class TeonetCli extends TeocliRTC {
       this.sendEvent('onclients', data);
       return 1;
     }
-    
+
     // Send 'onpeers' to subscribers
     this.onpeers = (err, data: object) => {
       console.debug("TeonetCli::onpeers", err, data);
@@ -257,10 +257,18 @@ export class TeonetCli extends TeocliRTC {
     this.ws.close();
   }
 
+  getConnectUrl() {
+    return this.connect_url.replace('ws://', '').replace('/ws', '');
+  }
+
+  setConnectUrl(url: string) {
+    this.connect_url = 'ws://' + url + '/ws';
+  }
+
   /**
    * Sel login page
    */
-  setLoginPage(func:()=>void) {
+  setLoginPage(func: () => void) {
     this.login_page = func;
   }
 
@@ -273,14 +281,14 @@ export class TeonetCli extends TeocliRTC {
       alert('TODO: Login page is udefined!');
     }
   }
-  
+
   /**
    * Sel SignUp page
    */
-  setSignupPage(func:()=>void) {
+  setSignupPage(func: () => void) {
     this.signup_page = func;
   }
-  
+
   /**
    * Load SignUp page
    */
@@ -290,11 +298,11 @@ export class TeonetCli extends TeocliRTC {
       alert('TODO: SignUp page is udefined!');
     }
   }
-  
+
   /**
    * Sel Restore page
    */
-  setRestorePage(func:()=>void) {
+  setRestorePage(func: () => void) {
     this.restore_page = func;
   }
 
@@ -307,7 +315,7 @@ export class TeonetCli extends TeocliRTC {
       alert('TODO: Restore page is udefined!');
     }
   }
-  
+
   /**
    * Is TeonetCli connected and initialized
    *
@@ -356,7 +364,7 @@ export class TeonetCli extends TeocliRTC {
 
   /**
    * Unsubscribe from event
-   * 
+   *
    * @param {eventSubscribersFunc} func
    */
   unsubscribe(func: eventSubscribersFunc): void {
@@ -410,11 +418,11 @@ export class TeonetCli extends TeocliRTC {
 };
 
 
-import {Component} from '@angular/core';
-import {AfterContentInit} from '@angular/core';
-import {IntervalObservable} from 'rxjs/observable/IntervalObservable';
+import { Component } from '@angular/core';
+import { AfterContentInit } from '@angular/core';
+import { IntervalObservable } from 'rxjs/observable/IntervalObservable';
 
-import {TeonetClientsNum} from './teocli.clients';
+import { TeonetClientsNum } from './teocli.clients';
 
 @Component({
   selector: 'teonet-status',
@@ -498,7 +506,7 @@ export class TeonetStatus implements AfterContentInit {
   private last_answere = 0.00;    //! Last peer answer time
 
   private SEND_ECHO_AFTER = 1.00; //! Send echo after timeout
-  private SET_LOGOFF_AFTER = 3.00;//! Set status logoff after timeout  
+  private SET_LOGOFF_AFTER = 3.00;//! Set status logoff after timeout
   private RECONNECT_AFTER = 8.00; //! Reconnect after timeout
 
   /**
@@ -536,9 +544,9 @@ export class TeonetStatus implements AfterContentInit {
             (current - this.last_answere) > this.RECONNECT_AFTER &&
             this.reconnect == 'true') {
             console.debug('TeonetStatus::IntervalObservable' +
-                        '- disconnect from teonet, ' +
-                        '(current - this.last_answere) = ',
-                        (current - this.last_answere)
+              '- disconnect from teonet, ' +
+              '(current - this.last_answere) = ',
+              (current - this.last_answere)
             );
             this.last_answere = 0;
             this.t.disconnect();

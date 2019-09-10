@@ -116,7 +116,7 @@ export class TeonetCli extends TeocliRTC {
         }
         // Set temporary name
         else {
-          this.setClientName('teo-cli-ts-ws-' + Math.floor((Math.random() * 100) + 1));
+          this.setClientName('teoclits-' + Math.floor((Math.random() * 100) + 1));
         }
       }
 

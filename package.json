@@ -1,6 +1,6 @@
 {
   "name": "teoclits",
-  "version": "0.0.13",
+  "version": "0.0.21",
   "description": "Typescript angular Teonet Client module",
   "main": "teocli.ts",
   "directories": {
